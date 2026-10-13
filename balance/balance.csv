@@ -11,7 +11,7 @@ player.weapon.type,crossbow,
 player.weapon.damage,3,damage of one shot
 player.weapon.range,3,cells
 player.weapon.maxCharges,3,charges before recharge
-player.weapon.rechargeTurns,TBD,turns to full recharge after exhaustion (GDD 7)
+player.weapon.rechargeTurns,5,ВРЕМЕННОЕ: turns to full recharge after exhaustion (GDD 7) (PLAN.md, пункт 17)
 player.weapon.shotsPerRow,1,shots per row
 
 # --- Enemy types ---
@@ -33,7 +33,7 @@ enemies.TYPE_3.weight,1,relative spawn weight
 
 # --- Enemy strength window (curve by row index, snapshot from DR) ---
 enemyWindow.floor.from,-1,weakest tier at row 0 relative to base hp
-enemyWindow.floor.slope,TBD,tier growth per row; DR had 7 over 30 levels
+enemyWindow.floor.slope,0.2,ВРЕМЕННОЕ: tier growth per row; DR had 7 over 30 levels (PLAN.md, пункт 17)
 enemyWindow.shape.0,0.70,share of weakest tier
 enemyWindow.shape.1,0.20,share of middle tier
 enemyWindow.shape.2,0.10,share of strongest tier
@@ -47,21 +47,21 @@ cells.ATTACK_CELL.damageMax,10,arena attack cell max damage
 
 # --- Row generation chances (per cell, snapshot from DR) ---
 rows.chances.ENEMY.from,0.10,row 0
-rows.chances.ENEMY.to,0.20,saturation row (TBD)
+rows.chances.ENEMY.to,0.20,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.WALL.from,0.15,row 0
-rows.chances.WALL.to,0.30,saturation row (TBD)
+rows.chances.WALL.to,0.30,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.HEAL.from,0.06,row 0
-rows.chances.HEAL.to,0.05,saturation row (TBD)
+rows.chances.HEAL.to,0.05,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.ENERGY.from,0.06,row 0
-rows.chances.ENERGY.to,0.04,saturation row (TBD)
+rows.chances.ENERGY.to,0.04,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.GOLD.from,0.03,row 0
-rows.chances.GOLD.to,0.03,saturation row (TBD)
+rows.chances.GOLD.to,0.03,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 
 # --- Boss ---
-boss.period,TBD,K: boss and checkpoint every K rows (GDD 3.2)
+boss.period,10,ВРЕМЕННОЕ: K: boss and checkpoint every K rows (GDD 3.2) (PLAN.md, пункт 17)
 boss.arenaRows,2,rows occupied by arena
 boss.hpMultiplier.from,1.2,elder hp as multiple of player hp at first boss (DR snapshot)
-boss.hpMultiplier.slope,TBD,growth per boss
+boss.hpMultiplier.slope,0.1,ВРЕМЕННОЕ: growth per boss (PLAN.md, пункт 17)
 
 # --- Arena (snapshot from DR, no ammo, no bonuses) ---
 arena.hpLowThreshold,0.5,
@@ -76,12 +76,12 @@ arena.chances.HEAL.hpHigh,0.15,
 arena.chances.ENERGY.playerRow,0.14,player row only
 
 # --- Camp ---
-camp.pricePercent,TBD,percent of current gold to set up camp (GDD 8.1)
-camp.payPercent,TBD,percent of current gold paid per turn after leaving camp (GDD 8.3)
-camp.payTurns,TBD,turns of payment after leaving camp
+camp.pricePercent,10,ВРЕМЕННОЕ: percent of current gold to set up camp (GDD 8.1) (PLAN.md, пункт 17)
+camp.payPercent,5,ВРЕМЕННОЕ: percent of current gold paid per turn after leaving camp (GDD 8.3) (PLAN.md, пункт 17)
+camp.payTurns,5,ВРЕМЕННОЕ: turns of payment after leaving camp (PLAN.md, пункт 17)
 
 # --- Memory ---
-memory.W,TBD,rows kept around current row in memory (GDD 3.1)
+memory.W,6,ВРЕМЕННОЕ: rows kept around current row in memory (GDD 3.1) (PLAN.md, пункт 17)
 
 # --- Timing (ms, snapshot from DR) ---
 timing.move_ms,250,
