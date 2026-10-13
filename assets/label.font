@@ -1,4 +1,5 @@
 font: "/builtins/fonts/vera_mo_bd.ttf"
+material: "/builtins/fonts/font.material"
 size: 30
 antialias: 1
 shadow_blur: 0
