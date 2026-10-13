@@ -1,0 +1,3 @@
+tile_set: "/builtins/graphics/particle_blob.tilesource"
+default_animation: "anim"
+material: "/builtins/materials/sprite.material"

@@ -19,17 +19,20 @@ local saves = require("scripts.saves")
 local MODES = world.MODES
 local BUTTON_HEIGHT = 100
 
+-- Цвета из GDD §12. Фон клетки (fill) и цвет подписи (ink) задаются отдельно.
+local function rgb(r, g, b)
+	return vmath.vector4(r / 255, g / 255, b / 255, 1)
+end
 local SYMBOL = {
-	EMPTY = { text = "", color = vmath.vector4(0.1, 0.11, 0.15, 1) },
-	WALL = { text = "#", color = vmath.vector4(0.25, 0.27, 0.34, 1) },
-	HEAL = { text = "+", color = vmath.vector4(0.06, 0.73, 0.51, 1) },
-	GOLD = { text = "$", color = vmath.vector4(1.0, 0.91, 0.38, 1) },
-	ENEMY = { text = "E", color = vmath.vector4(1.0, 0.12, 0.12, 1) },
-	CAMP = { text = "C", color = vmath.vector4(0.4, 0.8, 1.0, 1) },
-	ATTACK_CELL = { text = "A", color = vmath.vector4(0.77, 0.0, 0.08, 1) },
+	EMPTY = { text = "", fill = rgb(26, 29, 40), ink = rgb(26, 29, 40) },
+	WALL = { text = "#", fill = rgb(63, 69, 86), ink = rgb(160, 166, 180) },
+	HEAL = { text = "+", fill = rgb(16, 185, 129), ink = rgb(0, 0, 0) },
+	GOLD = { text = "$", fill = rgb(255, 231, 97), ink = rgb(0, 0, 0) },
+	ENEMY = { text = "E", fill = rgb(255, 31, 31), ink = rgb(255, 255, 255) },
+	CAMP = { text = "C", fill = rgb(92, 250, 255), ink = rgb(0, 0, 0) },
+	ATTACK_CELL = { text = "A", fill = rgb(196, 0, 20), ink = rgb(255, 255, 255) },
 }
-local PLAYER_COLOR = vmath.vector4(1, 1, 1, 1)
-
+local PLAYER = { text = "@", fill = rgb(255, 255, 255), ink = rgb(0, 0, 0) }
 local function has_event(events, type_)
 	for _, e in ipairs(events) do
 		if e.type == type_ then
@@ -59,14 +62,14 @@ local function clear_cells(self)
 	self.ids = {}
 end
 
-local function spawn(self, x, row, text, color)
+local function spawn(self, x, row, text, color, ink)
 	local pos = vmath.vector3(layout.cell_x(x), layout.cell_y(row, self.world.pos.y), 0)
 	local id = factory.create("#cell_factory", pos)
 	if id == nil then
 		print("cell spawn failed: label buffer full (raise [label] max_count in game.project)")
 		return
 	end
-	msg.post(id, "set", { text = text, color = color })
+	msg.post(id, "set", { text = text, color = color, text_color = ink, size = layout.CELL - 8 })
 	table.insert(self.ids, id)
 end
 
@@ -84,10 +87,10 @@ local function refresh(self)
 				local t = registry.enemies.types[c.enemy]
 				text = t.label:sub(1, 1) .. tostring(c.hp or t.base_hp)
 			end
-			spawn(self, x, row, text, sym.color)
+			spawn(self, x, row, text, sym.fill, sym.ink)
 		end
 	end
-	spawn(self, self.world.pos.x, pr, "@", PLAYER_COLOR)
+	spawn(self, self.world.pos.x, pr, PLAYER.text, PLAYER.fill, PLAYER.ink)
 end
 
 -- Текст HUD и кнопки внизу экрана.
@@ -128,6 +131,10 @@ end
 local function apply_events(self, events)
 	for _, e in ipairs(events) do
 		if e.type == "death" then
+			print("DEATH at row " .. self.world.pos.y)
+			for _, ev in ipairs(events) do
+				print("  event " .. ev.type .. (ev.damage and (" damage=" .. ev.damage) or "") .. (ev.hp and (" hp=" .. ev.hp) or ""))
+			end
 			world.transition(self.world, MODES.DEATH)
 		elseif e.type == "refused" then
 			print("refused: " .. e.reason)

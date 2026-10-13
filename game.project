@@ -5,6 +5,12 @@ version = 0.1.0
 [bootstrap]
 main_collection = /collections/world.collectionc
 
+[render]
+clear_color_red = 0.035
+clear_color_green = 0.04
+clear_color_blue = 0.047
+clear_color_alpha = 1.0
+
 [display]
 width = 720
 height = 1280

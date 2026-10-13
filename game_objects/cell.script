@@ -1,8 +1,15 @@
--- Клетка: надпись. Получает сообщение "set" с text и color (см. collections/world.script).
+-- Клетка: цветная подложка (sprite) и подпись (label). Сообщение "set":
+--   size (число, сторона в логических пикселях), color (фон), text, text_color.
+-- Исходный спрайт particle_blob — 32 px, масштабируется под размер клетки.
+
+local SPRITE_PX = 32
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("set") then
+		local s = message.size / SPRITE_PX
+		go.set_scale(vmath.vector3(s, s, 1))
+		go.set("#sprite", "tint", message.color)
+		go.set("#label", "color", message.text_color)
 		go.set("#label", "text", message.text)
-		go.set("#label", "color", message.color)
 	end
 end
