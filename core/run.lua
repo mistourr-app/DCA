@@ -26,7 +26,7 @@ local movement = require("core.movement")
 local visibility = require("core.visibility")
 local combat = require("core.combat")
 local equipment = require("core.equipment")
-local registry = require("core.registry")
+local registry = require("core.registry.init")
 local world = require("core.world")
 
 local M = {}

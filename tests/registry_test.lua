@@ -3,7 +3,7 @@
 -- данные баланса, из которых реестры будут строиться.
 
 local balance = require("core.data.balance")
-local registry = require("core.registry")
+local registry = require("core.registry.init")
 
 local M = {}
 

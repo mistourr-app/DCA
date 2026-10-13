@@ -12,7 +12,7 @@ local death = require("core.death")
 local camp = require("core.camp")
 local upgrades = require("core.upgrades")
 local save_schema = require("core.save_schema")
-local registry = require("core.registry")
+local registry = require("core.registry.init")
 local balance = require("core.data.balance")
 local saves = require("scripts.saves")
 
