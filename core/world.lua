@@ -52,7 +52,8 @@ function M.transition(w, to)
 	return true
 end
 
--- Ход игрока на соседнюю клетку следующего ряда (GDD §5.1). Только в режиме WORLD.
+-- Перемещение на клетку следующего ряда (GDD §5.1). Только в режиме WORLD.
+-- Любая колонка следующего ряда; стоимость в HP проверяет core/movement, не здесь.
 function M.move(w, to)
 	if w.mode ~= M.MODES.WORLD then
 		return false, "ходить можно только в режиме WORLD"
@@ -60,8 +61,8 @@ function M.move(w, to)
 	if not grid.in_columns(to.x) then
 		return false, "колонка вне поля"
 	end
-	if not grid.is_free_step(w.pos, to) then
-		return false, "свободный шаг только на соседнюю колонку следующего ряда"
+	if to.y ~= w.pos.y + 1 then
+		return false, "ход только на следующий ряд"
 	end
 	w.pos = { x = to.x, y = to.y }
 	return true
