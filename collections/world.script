@@ -1,0 +1,134 @@
+-- Скрипт мира: связка core/run с экраном (docs/ARCHITECTURE.md §5, §9).
+-- Вся логика — в core/. Здесь: окно рядов, отрисовка заглушками, тап, проигрывание событий.
+-- Анимаций пока нет: события применяются сразу (пункт 14.5, анимации — позже по timing.*).
+
+local run = require("core.run")
+local world = require("core.world")
+local row_gen = require("core.row_gen")
+local layout = require("core.layout")
+local equipment = require("core.equipment")
+local death = require("core.death")
+local registry = require("core.registry")
+local balance = require("core.data.balance")
+
+local SEED = 1
+
+local SYMBOL = {
+	EMPTY = { text = "", color = vmath.vector4(0.1, 0.11, 0.15, 1) },
+	WALL = { text = "#", color = vmath.vector4(0.25, 0.27, 0.34, 1) },
+	HEAL = { text = "+", color = vmath.vector4(0.06, 0.73, 0.51, 1) },
+	GOLD = { text = "$", color = vmath.vector4(1.0, 0.91, 0.38, 1) },
+	ENEMY = { text = "E", color = vmath.vector4(1.0, 0.12, 0.12, 1) },
+	CAMP = { text = "C", color = vmath.vector4(0.4, 0.8, 1.0, 1) },
+	ATTACK_CELL = { text = "A", color = vmath.vector4(0.77, 0.0, 0.08, 1) },
+}
+local PLAYER_COLOR = vmath.vector4(1, 1, 1, 1)
+
+-- Клетки ряда y из кэша; ряд генерируется по seed при первом обращении.
+local function get_row(self, y)
+	if y < 0 then
+		return nil
+	end
+	local cells = self.rows[y]
+	if cells == nil then
+		cells = row_gen.generate(SEED, y).cells
+		self.rows[y] = cells
+	end
+	return cells
+end
+
+local function clear_cells(self)
+	for _, id in ipairs(self.ids) do
+		go.delete(id)
+	end
+	self.ids = {}
+end
+
+local function spawn(self, x, row, text, color)
+	local pos = vmath.vector3(layout.cell_x(x), layout.cell_y(row, self.world.pos.y), 0)
+	local id = factory.create("#cell_factory", pos)
+	msg.post(id, "set", { text = text, color = color })
+	table.insert(self.ids, id)
+end
+
+-- Перерисовка окна: ряды вокруг игрока; игрок — отдельный символ.
+local function refresh(self)
+	clear_cells(self)
+	local pr = self.world.pos.y
+	for row = math.max(0, pr - layout.rows_below()), pr + layout.rows_above() do
+		local cells = get_row(self, row)
+		for x = 0, layout.COLUMNS - 1 do
+			local c = cells[x] or { type = "EMPTY" }
+			local sym = SYMBOL[c.type] or SYMBOL.EMPTY
+			local text = sym.text
+			if c.type == "ENEMY" then
+				text = registry.enemies.types[c.enemy].label:sub(1, 1) .. tostring(c.hp or registry.enemies.types[c.enemy].base_hp)
+			end
+			spawn(self, x, row, text, sym.color)
+		end
+	end
+	spawn(self, self.world.pos.x, pr, "@", PLAYER_COLOR)
+end
+
+-- Обработка событий ядра: смерть переводит в экран возврата (пункт 14.6 добавит GUI).
+local function apply_events(self, events)
+	for _, e in ipairs(events) do
+		if e.type == "death" then
+			self.player = death.respawn(self.player, self.world.return_point.kind)
+			world.transition(self.world, world.MODES.DEATH)
+			world.respawn(self.world)
+			print("смерть: возврат в " .. self.world.return_point.kind .. " ряд " .. self.world.pos.y)
+		elseif e.type == "refused" then
+			print("отказ: " .. e.reason)
+		end
+	end
+end
+
+function init(self)
+	msg.post(".", "acquire_input_focus")
+	self.rows = {}
+	self.ids = {}
+	self.world = world.new(SEED)
+	self.player = {
+		hp = balance.player.hp,
+		max_hp = balance.player.hp,
+		gold = 0,
+		weapon = equipment.new(balance.player.weapon.maxCharges, balance.player.weapon.rechargeTurns),
+	}
+	self.run = {
+		world = self.world,
+		player = self.player,
+		get_row = function(y)
+			return get_row(self, y)
+		end,
+	}
+	refresh(self)
+end
+
+function final(self)
+	clear_cells(self)
+end
+
+function on_input(self, action_id, action)
+	if action_id ~= hash("touch") or not action.pressed then
+		return false
+	end
+	local x, row = layout.cell_at(action.x, action.y, self.world.pos.y)
+	if x == nil then
+		return true
+	end
+	local target = (get_row(self, row) or {})[x]
+	local ok, events
+	if row == self.world.pos.y + 1 and target and target.type == "ENEMY" then
+		ok, events = run.melee(self.run, x, row)
+	elseif row == self.world.pos.y + 1 then
+		ok, events = run.step(self.run, x, row)
+	elseif row == self.world.pos.y and target and target.type == "ENEMY" then
+		ok, events = run.shoot(self.run, x)
+	else
+		return true
+	end
+	apply_events(self, events)
+	refresh(self)
+	return true
+end

@@ -1,2 +1,11 @@
 name: "world"
 scale_along_z: 0
+instances {
+  id: "world"
+  prototype: "/game_objects/world.go"
+  position {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  }
+}
