@@ -1,14 +1,13 @@
 -- Клетка: спрайт-подложка (sprite) и подпись (label). Сообщение "set":
---   size (сторона клетки, логические px), color (фон), text, text_color.
--- Масштаб задаётся только спрайту: если масштабировать сам объект, растягивается и надпись.
+--   width, height (логические px), color (фон), text, text_color.
+-- Масштаб задаётся только спрайту: если масштабировать сам объект, растянется и надпись.
 -- Исходный спрайт — assets/cell.png, 32 px.
 
 local SPRITE_PX = 32
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("set") then
-		local s = message.size / SPRITE_PX
-		go.set("#sprite", "scale", vmath.vector3(s, s, 1))
+		go.set("#sprite", "scale", vmath.vector3(message.width / SPRITE_PX, message.height / SPRITE_PX, 1))
 		go.set("#sprite", "tint", message.color)
 		go.set("#label", "color", message.text_color)
 		go.set("#label", "text", message.text)

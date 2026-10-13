@@ -89,6 +89,9 @@ timing.shot_ms,100,
 layout.columns,5,
 layout.logicalWidth,720,
 layout.logicalHeight,1280,
+layout.visibleRows,4,current row plus rows ahead; the rest is fog of war (GDD 5)
+layout.marginTop,100,space above the field for HUD
+layout.marginBottom,120,space below the field for the camp button
 
 # --- Upgrades (5 tracks, snapshot from DR) ---
 upgrades.hp.label,MIGHT
