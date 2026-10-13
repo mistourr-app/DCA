@@ -1,0 +1,13 @@
+*.lua text eol=lf
+*.csv text eol=lf
+*.collection text eol=lf
+*.go text eol=lf
+*.gui text eol=lf
+*.script text eol=lf
+*.gui_script text eol=lf
+*.project text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.png binary
+*.ogg binary
+*.wav binary
