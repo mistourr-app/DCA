@@ -83,7 +83,6 @@ nodes {
   xanchor: XANCHOR_NONE
   yanchor: YANCHOR_NONE
   pivot: PIVOT_CENTER
-  adjust_mode: ADJUST_STRETCH
   enabled: false
 }
 nodes {

@@ -4,7 +4,6 @@ material: "/builtins/fonts/label.material"
 text_leading: 1.0
 text_tracking: 0.0
 pivot: PIVOT_CENTER
-blend_mode: BLEND_ALPHA
 line_break: false
 size {
   x: 144.0
