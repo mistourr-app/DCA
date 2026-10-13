@@ -1,4 +1,5 @@
 local death = require("core.death")
+local balance = require("core.data.balance")
 
 local M = {}
 
@@ -25,7 +26,7 @@ M["camp respawn restores hp and weapon charges fully"] = function(t)
 	t.true_(not equipment.is_recharging(p.weapon), "перезарядка сброшена")
 end
 
-M["checkpoint respawn restores hp and weapon charges (GDD 9, уточнено)"] = function(t)
+M["checkpoint respawn restores hp and weapon charges (GDD 9)"] = function(t)
 	local p = death.respawn(player_at_death(), "checkpoint")
 	t.equal(p.hp, 20, "HP восстановлен")
 	t.equal(p.weapon.charges, 3, "заряды восстановлены")
@@ -42,9 +43,24 @@ M["no energy field exists in the player state"] = function(t)
 	t.equal(p.max_energy, nil, "максимума энергии нет")
 end
 
-M["gold and equipment are kept on respawn"] = function(t)
+M["death takes the configured percent of current gold"] = function(t)
+	local pct = balance.death.goldPenaltyPercent
+	local p, lost = death.respawn(player_at_death(), "camp")
+	t.equal(lost, math.floor(450 * pct / 100), "штраф от текущего золота")
+	t.equal(p.gold, 450 - lost, "остаток золота")
+end
+
+M["penalty rounds down and never makes gold negative"] = function(t)
+	t.equal(death.gold_penalty(0), 0, "ноль золота")
+	t.equal(death.gold_penalty(1), 0, "округление вниз")
+	local s = player_at_death()
+	s.gold = 0
+	local p = death.respawn(s, "checkpoint")
+	t.equal(p.gold, 0, "нулевое золото остаётся нулём")
+end
+
+M["equipment is kept on respawn"] = function(t)
 	local p = death.respawn(player_at_death(), "camp")
-	t.equal(p.gold, 450, "золото сохранено")
 	t.equal(p.equipment.weapon, "CROSSBOW", "экипировка сохранена")
 end
 
@@ -52,6 +68,7 @@ M["respawn does not modify the input state"] = function(t)
 	local before = player_at_death()
 	death.respawn(before, "camp")
 	t.equal(before.hp, 0, "исходный HP не изменён")
+	t.equal(before.gold, 450, "исходное золото не изменено")
 	t.equal(before.weapon.charges, 0, "исходные заряды не изменены")
 end
 

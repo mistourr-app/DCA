@@ -96,3 +96,6 @@ upgrades.maxAmmo.effect,1,added to max charges per level
 upgrades.maxAmmo.base,30,price of first level
 upgrades.maxAmmo.step,15,price growth per level
 board.columns,5,fixed number of columns on the field (GDD 3.2)
+
+# --- Death ---
+death.goldPenaltyPercent,50,percent of current gold lost on death (GDD 10); TEMPORARY value

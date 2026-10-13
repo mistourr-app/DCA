@@ -49,7 +49,7 @@ local function get_row(self, y)
 	end
 	local cells = self.rows[y]
 	if cells == nil then
-		cells = row_gen.generate(self.seed, y).cells
+		cells = row_gen.generate(self.seed, self.world.respawn_count, y).cells
 		self.rows[y] = cells
 	end
 	return cells
@@ -119,13 +119,26 @@ local function sync_hud(self)
 	})
 end
 
+-- Клетки ряда точки возврата сохраняются целиком: этот ряд не пересоздаётся между сессиями.
+local function return_point_for_save(self)
+	local rp = self.world.return_point
+	local out = { kind = rp.kind, row = rp.row, x = rp.x }
+	local cells = get_row(self, rp.row)
+	out.cells = {}
+	for x = 0, layout.COLUMNS - 1 do
+		out.cells[x + 1] = (cells[x] or { type = "EMPTY" }).type
+	end
+	return out
+end
+
 local function save(self)
 	saves.write({
 		version = save_schema.SCHEMA_VERSION,
 		seed = self.seed,
+		respawn_count = self.world.respawn_count,
 		gold = self.player.gold,
 		upgrades = self.upgrades,
-		return_point = self.world.return_point,
+		return_point = return_point_for_save(self),
 	})
 end
 
@@ -145,14 +158,27 @@ local function apply_events(self, events)
 end
 
 local function respawn(self)
-	local player, reason = death.respawn(self.player, self.world.return_point.kind)
+	local player, lost = death.respawn(self.player, self.world.return_point.kind)
 	if player == nil then
-		print(reason)
+		print(lost)
 		return
 	end
 	self.player = player
 	self.run.player = player
 	world.respawn(self.world)
+	-- Ряды выше точки возврата генерируются заново с новым respawn_count (GDD §11).
+	local rp_row = self.world.return_point.row
+	local stale = {}
+	for y in pairs(self.rows) do
+		if y > rp_row then
+			table.insert(stale, y)
+		end
+	end
+	for _, y in ipairs(stale) do
+		self.rows[y] = nil
+	end
+	print("respawn at " .. self.world.return_point.kind .. ", gold lost: " .. lost)
+	save(self)
 	sync_hud(self)
 	refresh(self)
 end
@@ -216,11 +242,19 @@ function init(self)
 	self.camp_state = camp.new_state()
 	self.rows = {}
 	self.ids = {}
-	self.world = world.new(self.seed)
+	self.world = world.new(self.seed, data.respawn_count)
 	if found then
 		local rp = data.return_point
 		self.world.return_point = { kind = rp.kind, row = rp.row, x = rp.x }
 		self.world.pos = { x = rp.x, y = rp.row }
+		if rp.cells then
+			-- Ряд точки возврата восстанавливается из сохранения, а не из генератора.
+			local cells = {}
+			for x = 0, layout.COLUMNS - 1 do
+				cells[x] = { type = rp.cells[x + 1] }
+			end
+			self.rows[rp.row] = cells
+		end
 	end
 	local stats = upgrades.stats({ levels = self.upgrades })
 	self.player = {

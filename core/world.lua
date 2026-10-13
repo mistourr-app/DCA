@@ -31,11 +31,13 @@ local WINDOW = balance.memory.W
 local START_COLUMN = math.floor(grid.COLUMNS / 2)
 
 -- Новый мир. global_seed — глобальный seed (GDD §11.1).
-function M.new(global_seed)
-	assert(type(global_seed) == "number", "global_seed должен быть числом")
+function M.new(world_seed, respawn_count)
+	respawn_count = respawn_count or 0
+	assert(type(world_seed) == "number", "world_seed должен быть числом")
 	local start = { kind = "start", row = 0, x = START_COLUMN }
 	return {
-		global_seed = global_seed,
+		world_seed = world_seed,
+		respawn_count = respawn_count,
 		mode = M.MODES.WORLD,
 		pos = { x = START_COLUMN, y = 0 },
 		return_point = start,
@@ -90,6 +92,8 @@ function M.respawn(w)
 	local rp = w.return_point
 	w.pos = { x = rp.x, y = rp.row }
 	w.mode = M.MODES.WORLD
+	-- Новая генерация рядов выше точки возврата (GDD §11).
+	w.respawn_count = w.respawn_count + 1
 	return true
 end
 

@@ -23,7 +23,7 @@ end
 
 M["checkpoint row has only walls or empty cells"] = function(t)
 	for r = 0, PERIOD * 30, PERIOD do
-		local row = row_gen.generate(1234, r)
+		local row = row_gen.generate(1234, 0, r)
 		for x = 0, COLUMNS - 1 do
 			local c = row.cells[x]
 			t.true_(c.type == "EMPTY" or c.type == "WALL",
@@ -34,14 +34,14 @@ M["checkpoint row has only walls or empty cells"] = function(t)
 end
 
 M["boss rows are not filled with cells"] = function(t)
-	local row = row_gen.generate(1, PERIOD - 1)
+	local row = row_gen.generate(1, 0, PERIOD - 1)
 	t.equal(row.kind, "boss", "тип")
 	t.equal(next(row.cells), nil, "клеток нет, арена генерируется отдельно")
 end
 
 M["normal row has exactly COLUMNS cells with valid types"] = function(t)
 	local allowed = { EMPTY = true, WALL = true, HEAL = true, GOLD = true, ENEMY = true }
-	local row = row_gen.generate(5, 1)
+	local row = row_gen.generate(5, 0, 1)
 	local count = 0
 	for x = 0, COLUMNS - 1 do
 		count = count + 1
@@ -54,7 +54,7 @@ M["enemies carry a valid enemy key"] = function(t)
 	local found = 0
 	for r = 1, 200 do
 		if row_gen.kind(r) == "normal" then
-			local row = row_gen.generate(77, r)
+			local row = row_gen.generate(77, 0, r)
 			for x = 0, COLUMNS - 1 do
 				local c = row.cells[x]
 				if c.type == "ENEMY" then
@@ -68,11 +68,11 @@ M["enemies carry a valid enemy key"] = function(t)
 end
 
 M["generation is deterministic and independent of order"] = function(t)
-	local direct = row_gen.generate(42, 137)
+	local direct = row_gen.generate(42, 0, 137)
 	for r = 0, 136 do
-		row_gen.generate(42, r)
+		row_gen.generate(42, 0, r)
 	end
-	local again = row_gen.generate(42, 137)
+	local again = row_gen.generate(42, 0, 137)
 	for x = 0, COLUMNS - 1 do
 		t.equal(again.cells[x].type, direct.cells[x].type, "тип на колонке " .. x)
 		t.equal(again.cells[x].enemy, direct.cells[x].enemy, "враг на колонке " .. x)
@@ -99,7 +99,7 @@ M["empirical wall share on normal rows matches the chance"] = function(t)
 	local expected = row_gen.chance("WALL", r)
 	local walls, total = 0, 0
 	for seed = 1, 400 do
-		local row = row_gen.generate(seed, r)
+		local row = row_gen.generate(seed, 0, r)
 		for x = 0, COLUMNS - 1 do
 			total = total + 1
 			if row.cells[x].type == "WALL" then

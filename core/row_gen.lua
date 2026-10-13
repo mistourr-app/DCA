@@ -103,13 +103,13 @@ local function checkpoint_cell(g, wall_chance)
 end
 
 -- Генерирует ряд r мира global_seed.
-function M.generate(global_seed, r)
+function M.generate(world_seed, respawn_count, r)
 	local kind = M.kind(r)
 	local out = { y = r, kind = kind, cells = {} }
 	if kind == "boss" then
 		return out
 	end
-	local g = rng.new(row_seed.row_seed(global_seed, r))
+	local g = rng.new(row_seed.row_seed(world_seed, respawn_count, r))
 	if kind == "checkpoint" then
 		local wall = M.chance("WALL", r)
 		for x = 0, COLUMNS - 1 do
