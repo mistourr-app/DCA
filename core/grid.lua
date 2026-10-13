@@ -6,7 +6,7 @@ local balance = require("core.data.balance")
 
 local M = {}
 
-M.COLUMNS = balance.layout.columns
+M.COLUMNS = balance.board.columns
 
 -- Колонка лежит на поле.
 function M.in_columns(x)

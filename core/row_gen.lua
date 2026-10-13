@@ -16,7 +16,7 @@ local row_seed = require("core.row_seed")
 
 local M = {}
 
-local COLUMNS = balance.layout.columns
+local COLUMNS = balance.board.columns
 local PERIOD = balance.boss.period
 local ARENA_ROWS = balance.boss.arenaRows
 local RAMP = balance.rows.rampRows

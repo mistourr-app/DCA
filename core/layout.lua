@@ -1,20 +1,21 @@
 -- Геометрия экрана: клетки поля <-> логические координаты (GDD §2, docs/ARCHITECTURE.md §7).
--- Чистая логика. Логическое разрешение 720x1280 (balance layout.*), начало координат снизу слева.
+-- Чистая логика. Логическое разрешение 720x1280 (design/design.csv, раздел screen.*), начало координат снизу слева.
 --
 -- Видимы VISIBLE_ROWS рядов: ряд игрока (k = 0, внизу поля) и ряды над ним (k = 1..VISIBLE_ROWS-1).
 -- Остальные ряды не рисуются (туман войны). Клетки растянуты по высоте, чтобы поле занимало
 -- экран между MARGIN_BOTTOM и HEIGHT - MARGIN_TOP.
 
 local balance = require("core.data.balance")
+local design = require("core.data.design")
 
 local M = {}
 
-M.COLUMNS = balance.layout.columns
-M.WIDTH = balance.layout.logicalWidth
-M.HEIGHT = balance.layout.logicalHeight
-M.VISIBLE_ROWS = balance.layout.visibleRows
-M.MARGIN_TOP = balance.layout.marginTop
-M.MARGIN_BOTTOM = balance.layout.marginBottom
+M.COLUMNS = balance.board.columns
+M.WIDTH = design.screen.width
+M.HEIGHT = design.screen.height
+M.VISIBLE_ROWS = design.screen.visibleRows
+M.MARGIN_TOP = design.screen.marginTop
+M.MARGIN_BOTTOM = design.screen.marginBottom
 
 M.CELL_W = math.floor(M.WIDTH / M.COLUMNS)
 M.CELL_H = math.floor((M.HEIGHT - M.MARGIN_TOP - M.MARGIN_BOTTOM) / M.VISIBLE_ROWS)

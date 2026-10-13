@@ -3,7 +3,7 @@ local balance = require("core.data.balance")
 
 local M = {}
 
-local COLUMNS = balance.layout.columns
+local COLUMNS = balance.board.columns
 local PERIOD = balance.boss.period
 
 M["schedule: checkpoint every K rows, boss arena before it"] = function(t)

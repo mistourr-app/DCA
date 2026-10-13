@@ -3,6 +3,7 @@
 -- данные баланса, из которых реестры будут строиться.
 
 local balance = require("core.data.balance")
+local design = require("core.data.design")
 local registry = require("core.registry.init")
 
 local M = {}
@@ -127,9 +128,17 @@ M["rows chance sums do not exceed 1"] = function(t)
 end
 
 M["layout is portrait 720x1280 with 5 columns"] = function(t)
-	t.equal(balance.layout.logicalWidth, 720, "ширина")
-	t.equal(balance.layout.logicalHeight, 1280, "высота")
-	t.equal(balance.layout.columns, 5, "колонки")
+	t.equal(design.screen.width, 720, "ширина")
+	t.equal(design.screen.height, 1280, "высота")
+	t.equal(balance.board.columns, 5, "колонки")
+end
+
+M["balance and design are separated"] = function(t)
+	t.true_(balance.layout == nil, "layout.* moved to design.csv")
+	t.true_(balance.timing == nil, "timing.* moved to design.csv as anim.*")
+	t.true_(design.board == nil, "board.* is a game rule, stays in balance.csv")
+	t.true_(design.enemies == nil and design.player == nil, "no game numbers in design.csv")
+	t.equal(balance.board.columns, 5, "column count lives in balance")
 end
 
 return M

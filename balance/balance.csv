@@ -79,19 +79,8 @@ camp.payTurns,5,ВРЕМЕННОЕ: turns of payment after leaving camp (PLAN.md
 memory.W,6,ВРЕМЕННОЕ: rows kept around current row in memory (GDD 3.1) (PLAN.md, пункт 17)
 
 # --- Timing (ms, snapshot from DR) ---
-timing.move_ms,250,
-timing.poke_ms,100,
-timing.death_ms,700,
-timing.lunge_ms,150,
-timing.shot_ms,100,
 
 # --- Layout ---
-layout.columns,5,
-layout.logicalWidth,720,
-layout.logicalHeight,1280,
-layout.visibleRows,4,current row plus rows ahead; the rest is fog of war (GDD 5)
-layout.marginTop,100,space above the field for HUD
-layout.marginBottom,120,space below the field for the camp button
 
 # --- Upgrades (5 tracks, snapshot from DR) ---
 upgrades.hp.label,MIGHT
@@ -106,3 +95,4 @@ upgrades.maxAmmo.label,QUIVER
 upgrades.maxAmmo.effect,1,added to max charges per level
 upgrades.maxAmmo.base,30,price of first level
 upgrades.maxAmmo.step,15,price growth per level
+board.columns,5,fixed number of columns on the field (GDD 3.2)

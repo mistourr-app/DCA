@@ -1,11 +1,12 @@
 local layout = require("core.layout")
 local balance = require("core.data.balance")
+local design = require("core.data.design")
 
 local M = {}
 
 M["visible rows come from balance and are four"] = function(t)
 	t.equal(layout.VISIBLE_ROWS, 4, "игрок и три ряда над ним")
-	t.equal(balance.layout.visibleRows, 4, "значение в CSV")
+	t.equal(design.screen.visibleRows, 4, "значение в CSV")
 end
 
 M["cells fit five columns in the logical width"] = function(t)
