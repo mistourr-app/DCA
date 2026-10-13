@@ -132,4 +132,105 @@ M["a turn that is refused does not tick recharge"] = function(t)
 	t.equal(r.player.weapon.recharge_left, before, "отказ не тратит ход перезарядки")
 end
 
+
+M["melee: player hits for its hp, enemy answers with its rest"] = function(t)
+	local rows = {
+		[0] = { [2] = { type = "EMPTY" } },
+		[1] = { [2] = { type = "ENEMY", enemy = "TYPE_2" } },
+	}
+	local r = make(rows, 3)
+	-- игрок 3 бьёт врага 7 -> остаток 4; враг отвечает 4 -> игрок 3 - 4 — смерть
+	local ok, events = run.melee(r, 2, 1)
+	t.true_(ok, "бой прошёл")
+	local p = has(events, "poke")
+	t.equal(p.dealt_to_enemy, 3, "игрок бьёт на свой HP")
+	t.equal(p.enemy_hp, 4, "у врага остаётся 4")
+	t.equal(p.dealt_to_player, 4, "враг отвечает остатком")
+end
+
+M["melee kills a weak enemy and leaves the player unhurt"] = function(t)
+	local rows = {
+		[0] = { [2] = { type = "EMPTY" } },
+		[1] = { [2] = { type = "ENEMY", enemy = "TYPE_1", hp = 2 } },
+	}
+	local r = make(rows, 10)
+	local _, events = run.melee(r, 2, 1)
+	t.true_(has(events, "enemy_dead") ~= nil, "враг мёртв")
+	t.equal(r.get_row(1)[2].type, "EMPTY", "клетка опустела")
+	t.equal(r.player.hp, 10, "враг не ответил: погиб от первого удара")
+	t.equal(r.world.pos.y, 0, "игрок остался на своей клетке (GDD 5.3 п.4)")
+end
+
+M["melee: enemy answers with its remaining hp"] = function(t)
+	local rows = {
+		[0] = { [2] = { type = "EMPTY" } },
+		[1] = { [2] = { type = "ENEMY", enemy = "TYPE_2", hp = 7 } },
+	}
+	local r = make(rows, 3)
+	-- игрок 3 бьёт врага 7 -> 4 HP; враг отвечает 4 -> игрок 3-4 = 0 — смерть
+	local _, events = run.melee(r, 2, 1)
+	t.true_(has(events, "death") ~= nil, "игрок погибает от ответа")
+end
+
+M["melee refused without enough hp for the approach"] = function(t)
+	local rows = {
+		[0] = { [2] = { type = "EMPTY" } },
+		[1] = { [4] = { type = "ENEMY", enemy = "TYPE_1" } },
+	}
+	local r = make(rows, 3)
+	-- dx 2 стоит 1 HP; при HP 1 после перехода было бы 0 — отказ
+	r.player.hp = 1
+	local ok = run.melee(r, 4, 1)
+	t.true_(not ok, "переход на HP 1 недоступен")
+end
+
+M["melee on an empty cell is refused"] = function(t)
+	local r = make({ [1] = { [2] = { type = "EMPTY" } } }, 10)
+	local ok = run.melee(r, 2, 1)
+	t.true_(not ok, "нет врага")
+end
+
+M["shot hits an enemy on the same row without a reply"] = function(t)
+	local rows = {
+		[0] = { [4] = { type = "ENEMY", enemy = "TYPE_2" } },
+	}
+	local r = make(rows, 10)
+	local ok, events = run.shoot(r, 4)
+	t.true_(ok, "выстрел прошёл")
+	t.equal(r.player.hp, 10, "враг не ответил")
+	t.equal(has(events, "shot").damage, 3, "урон арбалета 3")
+	t.equal(r.get_row(0)[4].hp, 4, "враг с 7 HP -> 4")
+	t.equal(r.world.pos.y, 0, "игрок не сдвинулся")
+end
+
+M["shot kills and clears the cell"] = function(t)
+	local rows = { [0] = { [4] = { type = "ENEMY", enemy = "TYPE_1", hp = 2 } } }
+	local r = make(rows, 10)
+	local _, events = run.shoot(r, 4)
+	t.true_(has(events, "enemy_dead") ~= nil, "враг мёртв")
+	t.equal(r.get_row(0)[4].type, "EMPTY", "клетка опустела")
+end
+
+M["only one shot per row"] = function(t)
+	local rows = { [0] = { [4] = { type = "ENEMY", enemy = "TYPE_2" }, [3] = { type = "ENEMY", enemy = "TYPE_1" } } }
+	local r = make(rows, 10)
+	run.shoot(r, 4)
+	local ok = run.shoot(r, 3)
+	t.true_(not ok, "второй выстрел на ряду запрещён")
+end
+
+M["shot out of range is refused"] = function(t)
+	local rows = { [0] = { [0] = { type = "ENEMY", enemy = "TYPE_1" } } }
+	local r = make(rows, 10)
+	r.world.pos = { x = 4, y = 0 }
+	local ok = run.shoot(r, 0)
+	t.true_(not ok, "дальше 3 клеток")
+end
+
+M["shot blocked by a wall"] = function(t)
+	local rows = { [0] = { [3] = { type = "WALL" }, [4] = { type = "ENEMY", enemy = "TYPE_2" } } }
+	local r = make(rows, 10)
+	local ok = run.shoot(r, 4)
+	t.true_(not ok, "стена между игроком и врагом")
+end
 return M

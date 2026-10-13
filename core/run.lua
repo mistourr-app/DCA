@@ -135,4 +135,95 @@ function M.step(run, x, y)
 	return true, events
 end
 
+-- Ближний бой (GDD §5.3). Клик по врагу на следующем ряду.
+--   1. атаки «в спину» врагов текущего ряда;
+--   2. игрок переходит на клетку врага: стоимость max(0, |dx|-1) HP (проверка как у хода);
+--   3. тычок: игрок бьёт на свой HP, враг отвечает остатком своего HP (combat.melee);
+--   4. игрок возвращается на свою клетку (GDD §5.3 п.4); враг мёртв — клетка становится EMPTY.
+-- Положение игрока не меняется; стоимость HP списывается.
+function M.melee(run, x, y)
+	local w = run.world
+	local pos = w.pos
+	local row_above = run.get_row(pos.y + 1)
+	local target = row_above and row_above[x]
+	if target == nil or target.type ~= "ENEMY" then
+		return false, { { type = "refused", reason = "в клетке нет врага" } }
+	end
+	if y ~= pos.y + 1 then
+		return false, { { type = "refused", reason = "ближний бой только с врагом на следующем ряду" } }
+	end
+	local cost = grid.jump_cost(pos, { x = x, y = y })
+	if run.player.hp - cost < 1 then
+		return false, { { type = "refused", reason = "не хватает HP на переход к врагу" } }
+	end
+
+	local events = behind_attacks(run, pos)
+	if run.player.hp <= 0 then
+		run.player.hp = 0
+		table.insert(events, { type = "death", at = { x = pos.x, y = pos.y } })
+		return true, events
+	end
+
+	run.player.hp = run.player.hp - cost
+	table.insert(events, { type = "approach", to = { x = x, y = y }, cost = cost })
+
+	local player_before = run.player.hp
+	local hp = enemy_hp(target)
+	local player_after, enemy_after = combat.melee(player_before, hp)
+	run.player.hp = player_after
+	table.insert(events, {
+		type = "poke",
+		dealt_to_enemy = player_before,
+		dealt_to_player = enemy_after,
+		enemy_hp = enemy_after,
+		hp = player_after,
+	})
+
+	if combat.is_dead(enemy_after) then
+		run.get_row(y)[x] = { type = "EMPTY" }
+		table.insert(events, { type = "enemy_dead", x = x, y = y })
+	else
+		run.get_row(y)[x].hp = enemy_after
+	end
+
+	if combat.is_dead(player_after) then
+		table.insert(events, { type = "death", at = { x = pos.x, y = pos.y } })
+	end
+	return true, events
+end
+
+-- Выстрел из арбалета по врагу на том же ряду (GDD §5.1, §5.3).
+-- Дальность — equipment.range; линия видимости — core/visibility; враг не отвечает.
+-- Не продвигает игрока и не завершает ход; ограничение один выстрел за ряд (core/equipment).
+function M.shoot(run, x)
+	local w = run.world
+	local pos = w.pos
+	local row = run.get_row(pos.y)
+	local target = row and row[x]
+	if target == nil or target.type ~= "ENEMY" then
+		return false, { { type = "refused", reason = "в клетке нет врага" } }
+	end
+	local weapon = run.player.weapon
+	local range = registry.equipment.CROSSBOW.range
+	local ok, reason = equipment.can_fire(weapon)
+	if not ok then
+		return false, { { type = "refused", reason = reason } }
+	end
+	if not visibility.can_see(pos, { x = x, y = pos.y }, { range = range, shape = "row" }, wall_fn(row)) then
+		return false, { { type = "refused", reason = "враг вне дальности или за стеной" } }
+	end
+
+	equipment.fire(weapon)
+	local damage = run.player.weapon_damage or registry.equipment.CROSSBOW.damage
+	local hp = combat.shot(enemy_hp(target), damage)
+	local events = { { type = "shot", x = x, damage = damage, enemy_hp = hp } }
+	if combat.is_dead(hp) then
+		row[x] = { type = "EMPTY" }
+		table.insert(events, { type = "enemy_dead", x = x, y = pos.y })
+	else
+		row[x].hp = hp
+	end
+	return true, events
+end
+
 return M
