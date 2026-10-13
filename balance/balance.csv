@@ -56,6 +56,7 @@ rows.chances.ENERGY.from,0.06,row 0
 rows.chances.ENERGY.to,0.04,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.GOLD.from,0.03,row 0
 rows.chances.GOLD.to,0.03,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
+rows.rampRows,30,ВРЕМЕННОЕ: ряд, на котором шансы достигают значений to; дальше постоянны (GDD 13, PLAN.md пункт 17)
 
 # --- Boss ---
 boss.period,10,ВРЕМЕННОЕ: K: boss and checkpoint every K rows (GDD 3.2) (PLAN.md, пункт 17)
