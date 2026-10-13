@@ -1,7 +1,13 @@
+﻿-- Точка входа: загружает мир через collection proxy и включает его.
+-- Мир сам запрашивает фокус ввода в своём init (collections/world.script).
+
 function init(self)
-	msg.post(".", "acquire_input_focus")
+	msg.post("#world", "load")
 end
 
-function on_input(self, action_id, action)
-	return false
+function on_message(self, message_id, message, sender)
+	if message_id == hash("proxy_loaded") then
+		msg.post(sender, "init")
+		msg.post(sender, "enable")
+	end
 end
