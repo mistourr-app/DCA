@@ -1,7 +1,7 @@
 script: "/gui/hud.gui_script"
 fonts {
   name: "system"
-  font: "/builtins/fonts/default.font"
+  font: "/assets/label.font"
 }
 nodes {
   position {

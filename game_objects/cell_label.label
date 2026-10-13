@@ -1,5 +1,5 @@
 text: ""
-font: "/builtins/fonts/default.font"
+font: "/assets/label.font"
 material: "/builtins/fonts/label.material"
 pivot: PIVOT_CENTER
 line_break: false
