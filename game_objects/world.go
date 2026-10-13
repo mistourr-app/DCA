@@ -6,3 +6,7 @@ components {
   id: "cell_factory"
   component: "/game_objects/cell_factory.factory"
 }
+components {
+  id: "hud"
+  component: "/gui/hud.gui"
+}

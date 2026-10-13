@@ -101,7 +101,7 @@ function M.step(run, x, y)
 	local hp_now = run.player.hp
 	local new_hp = movement.step(pos, hp_now, row_above, x, y)
 	if new_hp == nil then
-		return false, { { type = "refused", reason = "ход недоступен" } }
+		return false, { { type = "refused", reason = "Move not allowed" } }
 	end
 	local cost = hp_now - new_hp
 
@@ -147,14 +147,14 @@ function M.melee(run, x, y)
 	local row_above = run.get_row(pos.y + 1)
 	local target = row_above and row_above[x]
 	if target == nil or target.type ~= "ENEMY" then
-		return false, { { type = "refused", reason = "в клетке нет врага" } }
+		return false, { { type = "refused", reason = "No enemy there" } }
 	end
 	if y ~= pos.y + 1 then
-		return false, { { type = "refused", reason = "ближний бой только с врагом на следующем ряду" } }
+		return false, { { type = "refused", reason = "Melee only against an enemy on the next row" } }
 	end
 	local cost = grid.jump_cost(pos, { x = x, y = y })
 	if run.player.hp - cost < 1 then
-		return false, { { type = "refused", reason = "не хватает HP на переход к врагу" } }
+		return false, { { type = "refused", reason = "Not enough HP to reach the enemy" } }
 	end
 
 	local events = behind_attacks(run, pos)
@@ -201,7 +201,7 @@ function M.shoot(run, x)
 	local row = run.get_row(pos.y)
 	local target = row and row[x]
 	if target == nil or target.type ~= "ENEMY" then
-		return false, { { type = "refused", reason = "в клетке нет врага" } }
+		return false, { { type = "refused", reason = "No enemy there" } }
 	end
 	local weapon = run.player.weapon
 	local range = registry.equipment.CROSSBOW.range
@@ -210,7 +210,7 @@ function M.shoot(run, x)
 		return false, { { type = "refused", reason = reason } }
 	end
 	if not visibility.can_see(pos, { x = x, y = pos.y }, { range = range, shape = "row" }, wall_fn(row)) then
-		return false, { { type = "refused", reason = "враг вне дальности или за стеной" } }
+		return false, { { type = "refused", reason = "Enemy out of range or behind a wall" } }
 	end
 
 	equipment.fire(weapon)

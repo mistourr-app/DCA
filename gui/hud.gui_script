@@ -1,0 +1,21 @@
+-- HUD: только вывод текста и показ оверлея смерти. Ввод обрабатывает collections/world.script
+-- (тап по координатам), поэтому здесь нет обработки нажатий.
+
+local function set_overlay(visible)
+	gui.set_enabled(gui.get_node("overlay"), visible)
+	gui.set_enabled(gui.get_node("overlay_title"), visible)
+	gui.set_enabled(gui.get_node("overlay_hint"), visible)
+end
+
+function init(self)
+	set_overlay(false)
+end
+
+-- message.top, message.bottom — строки; message.overlay — показывать ли экран смерти.
+function on_message(self, message_id, message, sender)
+	if message_id == hash("update") then
+		gui.set_text(gui.get_node("top"), message.top)
+		gui.set_text(gui.get_node("bottom"), message.bottom)
+		set_overlay(message.overlay)
+	end
+end

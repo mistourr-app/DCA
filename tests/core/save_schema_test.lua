@@ -70,4 +70,23 @@ M["validate does not modify the input"] = function(t)
 	t.equal(raw.gold, 120, "исходное золото не тронуто")
 end
 
+M["valid return point is kept"] = function(t)
+	local raw = valid_raw()
+	raw.return_point = { kind = "camp", row = 12, x = 3 }
+	local out = save_schema.validate(raw)
+	t.equal(out.return_point.kind, "camp", "вид точки")
+	t.equal(out.return_point.row, 12, "ряд")
+	t.equal(out.return_point.x, 3, "колонка")
+end
+
+M["invalid return point falls back to start"] = function(t)
+	local raw = valid_raw()
+	raw.return_point = { kind = "teleport", row = 5, x = 1 }
+	t.equal(save_schema.validate(raw).return_point.kind, "start", "неизвестный вид")
+	raw.return_point = { kind = "camp", row = -3, x = 1 }
+	t.equal(save_schema.validate(raw).return_point.kind, "start", "отрицательный ряд")
+	raw.return_point = { kind = "camp", row = 3, x = 9 }
+	t.equal(save_schema.validate(raw).return_point.kind, "start", "колонка вне поля")
+end
+
 return M

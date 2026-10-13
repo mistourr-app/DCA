@@ -56,13 +56,13 @@ end
 -- Любая колонка следующего ряда; стоимость в HP проверяет core/movement, не здесь.
 function M.move(w, to)
 	if w.mode ~= M.MODES.WORLD then
-		return false, "ходить можно только в режиме WORLD"
+		return false, "Movement is only possible in the world"
 	end
 	if not grid.in_columns(to.x) then
-		return false, "колонка вне поля"
+		return false, "Column is outside the field"
 	end
 	if to.y ~= w.pos.y + 1 then
-		return false, "ход только на следующий ряд"
+		return false, "Can only move to the next row"
 	end
 	w.pos = { x = to.x, y = to.y }
 	return true

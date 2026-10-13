@@ -31,17 +31,17 @@ end
 -- row_cells: клетки текущего ряда; row_has_enemies берётся из них.
 function M.can_install(state, gold, row_cells)
 	if state.pay_turns_left > 0 then
-		return false, "оплата предыдущего лагеря не закончилась"
+		return false, "Camp payment is still running"
 	end
 	if gold <= 0 then
-		return false, "нет золота"
+		return false, "No gold"
 	end
 	if M.install_price(gold) <= 0 then
-		return false, "ценник равен нулю"
+		return false, "Camp costs nothing here"
 	end
 	for _, cell in pairs(row_cells) do
 		if cell.type == "ENEMY" then
-			return false, "на ряду есть враги"
+			return false, "Enemies on this row"
 		end
 	end
 	return true

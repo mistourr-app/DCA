@@ -5,13 +5,17 @@
 --   version должна совпадать с SCHEMA_VERSION, иначе данные отвергаются целиком;
 --   неизвестные ключи отбрасываются;
 --   отрицательные и нечисловые значения заменяются значением по умолчанию;
+--   точка возврата проверяется по виду и границам поля;
 --   ключи, которых нет в схеме (включая прототипные), не копируются.
 
 local upgrades = require("core.upgrades")
+local grid = require("core.grid")
 
 local M = {}
 
 M.SCHEMA_VERSION = 1
+
+local RETURN_KINDS = { start = true, camp = true, checkpoint = true }
 
 local function non_negative_int(v)
 	return type(v) == "number" and v >= 0 and v == math.floor(v)
@@ -24,7 +28,16 @@ function M.default()
 		seed = 1,
 		gold = 0,
 		upgrades = upgrades.new_state().levels,
+		return_point = { kind = "start", row = 0, x = math.floor(grid.COLUMNS / 2) },
 	}
+end
+
+local function valid_return_point(rp)
+	return type(rp) == "table"
+		and RETURN_KINDS[rp.kind] == true
+		and non_negative_int(rp.row)
+		and non_negative_int(rp.x)
+		and rp.x < grid.COLUMNS
 end
 
 -- Возвращает очищенную таблицу сохранения или nil и причину (несовпадение версии).
@@ -49,6 +62,9 @@ function M.validate(raw)
 				out.upgrades[track] = v
 			end
 		end
+	end
+	if valid_return_point(raw.return_point) then
+		out.return_point = { kind = raw.return_point.kind, row = raw.return_point.row, x = raw.return_point.x }
 	end
 	return out
 end

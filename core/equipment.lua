@@ -34,10 +34,10 @@ end
 -- Можно ли применить предмет сейчас.
 function M.can_use(e)
 	if M.is_recharging(e) then
-		return false, "предмет перезаряжается"
+		return false, "Weapon is recharging"
 	end
 	if e.charges <= 0 then
-		return false, "нет зарядов"
+		return false, "No charges left"
 	end
 	return true
 end
@@ -58,7 +58,7 @@ end
 -- Выстрел из оружия: применение плюс ограничение один выстрел за ряд.
 function M.can_fire(e)
 	if e.fired_this_row then
-		return false, "уже стреляли на этом ряду"
+		return false, "Already fired on this row"
 	end
 	return M.can_use(e)
 end
