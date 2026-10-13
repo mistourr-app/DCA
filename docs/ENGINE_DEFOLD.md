@@ -58,6 +58,12 @@
 - Компоненты `collectionproxy` в game object-ах для стартовой загрузки не используются: при сборке это дало ошибку `Assert failed: (map? game-object-build-target)`. Вернуться к промежуточной коллекции — только если появится реальная необходимость (например, экран загрузки).
 - Текстовые файлы Defold без BOM (см. `AI_CODING_RULES.md`, раздел 13a).
 
+## 3b. Поля и enum в файлах Defold
+
+- Имена полей и значений enum из памяти не использовать. Перед записью сверять с манулом 1.14.0 или со схемой .proto (поля LabelDesc, NodeDesc и т.д.).
+- Неизвестное поле или значение enum делает файл нечитаемым, и редактор падает при загрузке проекта. Ошибки смотреть в логе редактора: C:\Users\<user>\AppData\Local\Defold\editor2.<дата>.log (поиск: WARN Unable to read resource, ERROR).
+- Уже проверено в 1.14.0: у label нет полей text_leading, text_tracking, align, blend_mode; у gui нет значений ADJUST_FIT, ADJUST_STRETCH.
+
 ## 4. Mobile-специфика
 
 - Ориентация портрет: `dynamic_orientation = 0`. Лейаут строится по логическим координатам 720×1280.
