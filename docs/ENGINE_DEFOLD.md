@@ -62,6 +62,7 @@
 
 - Имена полей и значений enum из памяти не использовать. Перед записью сверять с манулом 1.14.0 или со схемой .proto (поля LabelDesc, NodeDesc и т.д.).
 - Неизвестное поле или значение enum делает файл нечитаемым, и редактор падает при загрузке проекта. Ошибки смотреть в логе редактора: C:\Users\<user>\AppData\Local\Defold\editor2.<дата>.log (поиск: WARN Unable to read resource, ERROR).
+- Встроенные ресурсы: builtins — это builtins.zip внутри установки Defold (C:\Users\<user>\AppData\Local\Defold\unpack\<версия>\builtins\builtins.zip). Пути проверять по нему. Шрифт по умолчанию: /builtins/fonts/default.font (system_font.font в 1.14 не существует).
 - Уже проверено в 1.14.0: у label нет полей text_leading, text_tracking, align, blend_mode; у gui нет значений ADJUST_FIT, ADJUST_STRETCH.
 
 ## 4. Mobile-специфика
