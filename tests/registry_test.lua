@@ -45,8 +45,16 @@ end
 
 M["cell amounts are present for item cells"] = function(t)
 	t.true_(balance.cells.HEAL.amount ~= nil, "HEAL.amount")
-	t.true_(balance.cells.ENERGY.amount ~= nil, "ENERGY.amount")
 	t.true_(balance.cells.GOLD.amount ~= nil, "GOLD.amount")
+end
+
+M["no energy remains in balance"] = function(t)
+	t.true_(balance.player.energy == nil, "player.energy удалён (энергии нет)")
+	t.true_(balance.cells.ENERGY == nil, "клетка ENERGY удалена")
+	t.true_(balance.rows.chances.ENERGY == nil, "шанс ENERGY удалён")
+	t.true_(balance.arena.supply == nil, "пол арены (был только по энергии) удалён")
+	t.true_(balance.upgrades.energy == nil, "трек VIGOUR удалён")
+	t.true_(balance.upgrades.energyPerCell == nil, "трек SIPHON удалён")
 end
 
 M["no AMMO or bonus cells remain in balance"] = function(t)
@@ -57,12 +65,12 @@ M["no AMMO or bonus cells remain in balance"] = function(t)
 	t.true_(balance.upgrades.attackBonus == nil, "бонус атаки удалён из прокачки")
 end
 
-M["upgrades: five tracks"] = function(t)
+M["upgrades: three tracks (energy tracks removed)"] = function(t)
 	local count = 0
 	for _ in pairs(balance.upgrades) do
 		count = count + 1
 	end
-	t.equal(count, 5, "число треков прокачки")
+	t.equal(count, 3, "число треков прокачки: hp, weaponDamage, maxAmmo")
 end
 
 M["rows chance sums do not exceed 1"] = function(t)

@@ -40,7 +40,7 @@ M["boss rows are not filled with cells"] = function(t)
 end
 
 M["normal row has exactly COLUMNS cells with valid types"] = function(t)
-	local allowed = { EMPTY = true, WALL = true, HEAL = true, ENERGY = true, GOLD = true, ENEMY = true }
+	local allowed = { EMPTY = true, WALL = true, HEAL = true, GOLD = true, ENEMY = true }
 	local row = row_gen.generate(5, 1)
 	local count = 0
 	for x = 0, COLUMNS - 1 do

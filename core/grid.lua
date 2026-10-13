@@ -18,7 +18,7 @@ function M.is_free_step(from, to)
 	return to.y == from.y + 1 and math.abs(to.x - from.x) <= 1
 end
 
--- Стоимость прыжка в энергии: max(0, |dx| - 1) (GDD §5.1).
+-- Стоимость хода в HP: max(0, |dx| - 1) (GDD §5.1). Энергии нет, HP — единственный ресурс движения.
 function M.jump_cost(from, to)
 	return math.max(0, math.abs(to.x - from.x) - 1)
 end

@@ -1,9 +1,10 @@
 -- Смерть и возврат в точку возврата (GDD §8.4, §10).
--- Чистая логика. Состояние игрока: { hp, max_hp, energy, max_energy, charges, max_charges, gold, equipment }.
+-- Чистая логика. Состояние игрока: { hp, max_hp, charges, max_charges, gold, equipment }.
 --
 -- Правила:
---   возврат в лагерь (kind = "camp"): полное восстановление HP, энергии и зарядов;
---   возврат в чекпоинт или на старт (kind = "checkpoint" | "start"): без восстановления (GDD §9);
+--   возврат в лагерь (kind = "camp"): полное восстановление HP и зарядов;
+--   возврат в чекпоинт или на старт (kind = "checkpoint" | "start"): HP и заряды восстанавливаются
+--     до максимума (уточнено пользователем: чекпоинт восстанавливает HP и заряды, GDD §9);
 --   экипировка и золото сохраняются;
 --   собранное и убитое не возвращается: журнал не откатывается (GDD §10).
 
@@ -28,14 +29,12 @@ end
 
 -- Возвращает новое состояние игрока после смерти в точке возврата kind.
 function M.respawn(player, kind)
-	local out = copy(player)
-	if kind == "camp" then
-		out.hp = out.max_hp
-		out.energy = out.max_energy
-		out.charges = out.max_charges
-	elseif kind ~= "checkpoint" and kind ~= "start" then
+	if kind ~= "camp" and kind ~= "checkpoint" and kind ~= "start" then
 		return nil, "неизвестный вид точки возврата: " .. tostring(kind)
 	end
+	local out = copy(player)
+	out.hp = out.max_hp
+	out.charges = out.max_charges
 	return out
 end
 

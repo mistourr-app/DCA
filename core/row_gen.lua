@@ -1,6 +1,6 @@
 -- Генерация рядов (GDD §3.2, §9, §13).
 -- Ряд = { y = номер, kind = "normal" | "boss" | "checkpoint", cells = { [x] = клетка } }.
--- x — 0-based колонка. Клетка: { type = "EMPTY" | "WALL" | "HEAL" | "ENERGY" | "GOLD" | "ENEMY", enemy = ключ }.
+-- x — 0-based колонка. Клетка: { type = "EMPTY" | "WALL" | "HEAL" | "GOLD" | "ENEMY", enemy = ключ }.
 -- Ряд полностью определяется глобальным seed и номером ряда (row_seed).
 --
 -- Расписание рядов (boss.period = K, boss.arenaRows = A):
@@ -25,7 +25,7 @@ assert(PERIOD >= ARENA_ROWS + 2, "boss.period должен оставлять х
 assert(RAMP > 0, "rows.rampRows должен быть положительным")
 
 -- Порядок накопления шансов при выборе содержимого клетки обычного ряда.
-local CELL_ORDER = { "ENEMY", "WALL", "HEAL", "ENERGY", "GOLD" }
+local CELL_ORDER = { "ENEMY", "WALL", "HEAL", "GOLD" }
 
 -- Типы врагов в фиксированном порядке (для детерминизма выбора).
 local ENEMY_KEYS = {}

@@ -6,8 +6,6 @@ local function player_at_death()
 	return {
 		hp = 0,
 		max_hp = 20,
-		energy = 2,
-		max_energy = 10,
 		charges = 0,
 		max_charges = 3,
 		gold = 450,
@@ -15,18 +13,27 @@ local function player_at_death()
 	}
 end
 
-M["camp respawn restores hp, energy and charges fully"] = function(t)
+M["camp respawn restores hp and charges fully"] = function(t)
 	local p = death.respawn(player_at_death(), "camp")
 	t.equal(p.hp, 20, "HP полностью")
-	t.equal(p.energy, 10, "энергия полностью")
 	t.equal(p.charges, 3, "заряды полностью")
 end
 
-M["checkpoint respawn does not restore anything"] = function(t)
+M["checkpoint respawn restores hp and charges (GDD 9, уточнено)"] = function(t)
 	local p = death.respawn(player_at_death(), "checkpoint")
-	t.equal(p.hp, 0, "HP не восстановлен")
-	t.equal(p.energy, 2, "энергия не восстановлена")
-	t.equal(p.charges, 0, "заряды не восстановлены")
+	t.equal(p.hp, 20, "HP восстановлен")
+	t.equal(p.charges, 3, "заряды восстановлены")
+end
+
+M["start respawn restores hp and charges"] = function(t)
+	local p = death.respawn(player_at_death(), "start")
+	t.equal(p.hp, 20, "HP восстановлен")
+end
+
+M["no energy field exists in the player state"] = function(t)
+	local p = death.respawn(player_at_death(), "camp")
+	t.equal(p.energy, nil, "энергии нет")
+	t.equal(p.max_energy, nil, "максимума энергии нет")
 end
 
 M["gold and equipment are kept on respawn"] = function(t)

@@ -6,7 +6,6 @@
 
 # --- Player ---
 player.hp,20,base max hp; also melee damage
-player.energy,10,base max energy
 player.weapon.type,crossbow,
 player.weapon.damage,3,damage of one shot
 player.weapon.range,3,cells
@@ -40,7 +39,6 @@ enemyWindow.shape.2,0.10,share of strongest tier
 
 # --- Cells ---
 cells.HEAL.amount,6,hp restored
-cells.ENERGY.amount,10,energy restored
 cells.GOLD.amount,10,gold added
 cells.ATTACK_CELL.damageMin,5,arena attack cell min damage
 cells.ATTACK_CELL.damageMax,10,arena attack cell max damage
@@ -52,8 +50,6 @@ rows.chances.WALL.from,0.15,row 0
 rows.chances.WALL.to,0.30,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.HEAL.from,0.06,row 0
 rows.chances.HEAL.to,0.05,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
-rows.chances.ENERGY.from,0.06,row 0
-rows.chances.ENERGY.to,0.04,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.chances.GOLD.from,0.03,row 0
 rows.chances.GOLD.to,0.03,saturation row (ВРЕМЕННО: насыщение на 30 рядах)
 rows.rampRows,30,ВРЕМЕННОЕ: ряд, на котором шансы достигают значений to; дальше постоянны (GDD 13, PLAN.md пункт 17)
@@ -67,14 +63,12 @@ boss.hpMultiplier.slope,0.1,ВРЕМЕННОЕ: growth per boss (PLAN.md, пун
 # --- Arena (snapshot from DR, no ammo, no bonuses) ---
 arena.hpLowThreshold,0.5,
 arena.hpHighThreshold,0.75,
-arena.supply.energy,1,energy cells guaranteed on player row
 arena.chances.ATTACK_CELL.base,0.20,
 arena.chances.ATTACK_CELL.hpLow,0.10,
 arena.chances.ATTACK_CELL.hpHigh,0.30,
 arena.chances.HEAL.base,0.25,
 arena.chances.HEAL.hpLow,0.35,
 arena.chances.HEAL.hpHigh,0.15,
-arena.chances.ENERGY.playerRow,0.14,player row only
 
 # --- Camp ---
 camp.pricePercent,10,ВРЕМЕННОЕ: percent of current gold to set up camp (GDD 8.1) (PLAN.md, пункт 17)
@@ -101,10 +95,6 @@ upgrades.hp.label,MIGHT
 upgrades.hp.effect,5,added to max hp per level
 upgrades.hp.base,20,price of first level
 upgrades.hp.step,10,price growth per level
-upgrades.energy.label,VIGOUR
-upgrades.energy.effect,2,added to max energy per level
-upgrades.energy.base,15,price of first level
-upgrades.energy.step,8,price growth per level
 upgrades.weaponDamage.label,BOLT POWER
 upgrades.weaponDamage.effect,1,added to weapon damage per level
 upgrades.weaponDamage.base,25,price of first level
@@ -113,7 +103,3 @@ upgrades.maxAmmo.label,QUIVER
 upgrades.maxAmmo.effect,1,added to max charges per level
 upgrades.maxAmmo.base,30,price of first level
 upgrades.maxAmmo.step,15,price growth per level
-upgrades.energyPerCell.label,SIPHON
-upgrades.energyPerCell.effect,2,added to energy per energy cell
-upgrades.energyPerCell.base,20,price of first level
-upgrades.energyPerCell.step,10,price growth per level
