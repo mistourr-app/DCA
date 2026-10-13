@@ -1,7 +1,6 @@
 [project]
 title = Dungeon Card Crawler
 version = 0.1.0
-write_log_file = Debug
 
 [bootstrap]
 main_collection = /main/main.collectionc
