@@ -1,4 +1,4 @@
-﻿-- Точка входа: загружает мир через collection proxy и включает его.
+-- Точка входа: загружает мир через collection proxy и включает его.
 -- Мир сам запрашивает фокус ввода в своём init (collections/world.script).
 
 function init(self)

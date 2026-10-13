@@ -1,4 +1,4 @@
-﻿components {
+components {
   id: "label"
   component: "/game_objects/cell_label.label"
 }

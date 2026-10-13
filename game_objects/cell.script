@@ -1,4 +1,4 @@
-﻿-- Клетка: заглушка-надпись. Получает сообщение "set" с text и color (см. collections/world.script).
+-- Клетка: заглушка-надпись. Получает сообщение "set" с text и color (см. collections/world.script).
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("set") then
