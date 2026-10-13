@@ -27,12 +27,9 @@ assert(RAMP > 0, "rows.rampRows должен быть положительным
 -- Порядок накопления шансов при выборе содержимого клетки обычного ряда.
 local CELL_ORDER = { "ENEMY", "WALL", "HEAL", "GOLD" }
 
--- Типы врагов в фиксированном порядке (для детерминизма выбора).
-local ENEMY_KEYS = {}
-for key in pairs(balance.enemies) do
-	table.insert(ENEMY_KEYS, key)
-end
-table.sort(ENEMY_KEYS)
+-- Типы врагов из реестра, в фиксированном порядке (для детерминизма выбора).
+local enemies = require("core.registry.enemies")
+local ENEMY_KEYS = enemies.keys
 
 function M.kind(r)
 	assert(type(r) == "number" and r >= 0 and r == math.floor(r), "номер ряда — неотрицательное целое")
@@ -70,12 +67,12 @@ end
 local function pick_enemy(g)
 	local total = 0
 	for _, key in ipairs(ENEMY_KEYS) do
-		total = total + balance.enemies[key].weight
+		total = total + enemies.types[key].weight
 	end
 	local roll = g:float() * total
 	local acc = 0
 	for _, key in ipairs(ENEMY_KEYS) do
-		acc = acc + balance.enemies[key].weight
+		acc = acc + enemies.types[key].weight
 		if roll < acc then
 			return key
 		end

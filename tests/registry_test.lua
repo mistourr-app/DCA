@@ -3,8 +3,51 @@
 -- данные баланса, из которых реестры будут строиться.
 
 local balance = require("core.data.balance")
+local registry = require("core.registry")
 
 local M = {}
+
+M["registry validates: all entries have required fields"] = function(t)
+	local errors = registry.validate()
+	t.equal(#errors, 0, "ошибки реестра: " .. table.concat(errors, "; "))
+end
+
+M["registry enemy keys are TYPE_N and match balance"] = function(t)
+	for _, key in ipairs(registry.enemies.keys) do
+		t.true_(balance.enemies[key] ~= nil, "враг " .. key .. " есть в балансе")
+	end
+	t.equal(#registry.enemies.keys, 3, "три типа врагов")
+end
+
+M["registry cells cover every cell type the core uses"] = function(t)
+	for _, name in ipairs({ "EMPTY", "WALL", "HEAL", "GOLD", "ENEMY", "ATTACK_CELL", "CAMP" }) do
+		t.true_(registry.cells[name] ~= nil, "клетка " .. name)
+	end
+	t.true_(registry.cells.ENERGY == nil, "клетки ENERGY нет (GDD §22)")
+	t.true_(registry.cells.AMMO == nil, "клетки AMMO нет (GDD §22)")
+end
+
+M["registry equipment has only the crossbow in one slot"] = function(t)
+	local count, slots = 0, {}
+	for _, e in pairs(registry.equipment) do
+		count = count + 1
+		slots[e.slot] = (slots[e.slot] or 0) + 1
+	end
+	t.equal(count, 1, "один предмет")
+	t.equal(slots.weapon, 1, "слот weapon один")
+end
+
+M["row kinds are the four GDD kinds"] = function(t)
+	for _, name in ipairs({ "normal", "boss", "checkpoint", "camp" }) do
+		t.true_(registry.row_kinds[name] ~= nil, "тип ряда " .. name)
+	end
+end
+
+M["boss hp multiplier grows with boss number"] = function(t)
+	t.equal(registry.bosses.hp_multiplier(1), balance.boss.hpMultiplier.from, "первый босс")
+	t.true_(registry.bosses.hp_multiplier(2) > registry.bosses.hp_multiplier(1), "второй сильнее")
+end
+
 
 local REQUIRED_ENEMY_FIELDS = { "label", "hp", "visionRange", "visionShape", "weight" }
 
