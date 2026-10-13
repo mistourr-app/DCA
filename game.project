@@ -15,3 +15,6 @@ swap_interval = 1
 
 [input]
 use_accelerometer = 0
+
+[label]
+max_count = 512
