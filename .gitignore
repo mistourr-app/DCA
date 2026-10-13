@@ -1,0 +1,48 @@
+/.editor_settings
+/.internal
+/build
+.DS_Store
+Thumbs.db
+
+# Defold compiled output
+*.projectc
+*.collectionc
+*.goc
+*.guic
+*.luac
+*.dmanifest
+*.darc
+*.arcd
+*.arci
+*.texturec
+*.atlasc
+*.tilesourcec
+*.fontc
+*.spritec
+*.tilemapc
+*.animc
+*.soundc
+*.materialc
+*.vpc
+*.fpc
+*.render_scriptc
+*.scriptc
+*.gui_scriptc
+*.compute
+*.ttf.dmfont
+
+# Logs and editors
+*.log
+.vscode/
+.idea/
+
+# Secrets and signing
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+secrets/
+
+# Python tools cache
+__pycache__/
+*.pyc

@@ -1,0 +1,118 @@
+# balance.csv: единственный источник чисел баланса.
+# Формат: path,value,notes (запятые в notes не использовать).
+# Снимок из DR, очищенный от бонусов атаки и защиты, патронов (AMMO, boltsPerCell)
+# и кампании из 30 уровней. Значения TBD решаются после первой сборки (PLAN.md, пункт 17).
+# Генерация: python tools/build_balance.py. Отказ на TBD при генерации.
+
+# --- Player ---
+player.hp,20,base max hp; also melee damage
+player.energy,10,base max energy
+player.weapon.type,crossbow,
+player.weapon.damage,3,damage of one shot
+player.weapon.range,3,cells
+player.weapon.maxCharges,3,charges before recharge
+player.weapon.rechargeTurns,TBD,turns to full recharge after exhaustion (GDD 7)
+player.weapon.shotsPerRow,1,shots per row
+
+# --- Enemy types ---
+enemies.TYPE_1.label,ARCANIST,
+enemies.TYPE_1.hp,4,base hp for strength window
+enemies.TYPE_1.visionRange,4,cells along own row
+enemies.TYPE_1.visionShape,row,
+enemies.TYPE_1.weight,1,relative spawn weight
+enemies.TYPE_2.label,SPEARMAN,
+enemies.TYPE_2.hp,7,base hp for strength window
+enemies.TYPE_2.visionRange,2,cells along own row
+enemies.TYPE_2.visionShape,row,
+enemies.TYPE_2.weight,1,relative spawn weight
+enemies.TYPE_3.label,WARDEN,
+enemies.TYPE_3.hp,10,base hp for strength window
+enemies.TYPE_3.visionRange,1,sees and strikes only cells to its sides
+enemies.TYPE_3.visionShape,sides,
+enemies.TYPE_3.weight,1,relative spawn weight
+
+# --- Enemy strength window (curve by row index, snapshot from DR) ---
+enemyWindow.floor.from,-1,weakest tier at row 0 relative to base hp
+enemyWindow.floor.slope,TBD,tier growth per row; DR had 7 over 30 levels
+enemyWindow.shape.0,0.70,share of weakest tier
+enemyWindow.shape.1,0.20,share of middle tier
+enemyWindow.shape.2,0.10,share of strongest tier
+
+# --- Cells ---
+cells.HEAL.amount,6,hp restored
+cells.ENERGY.amount,10,energy restored
+cells.GOLD.amount,10,gold added
+cells.ATTACK_CELL.damageMin,5,arena attack cell min damage
+cells.ATTACK_CELL.damageMax,10,arena attack cell max damage
+
+# --- Row generation chances (per cell, snapshot from DR) ---
+rows.chances.ENEMY.from,0.10,row 0
+rows.chances.ENEMY.to,0.20,saturation row (TBD)
+rows.chances.WALL.from,0.15,row 0
+rows.chances.WALL.to,0.30,saturation row (TBD)
+rows.chances.HEAL.from,0.06,row 0
+rows.chances.HEAL.to,0.05,saturation row (TBD)
+rows.chances.ENERGY.from,0.06,row 0
+rows.chances.ENERGY.to,0.04,saturation row (TBD)
+rows.chances.GOLD.from,0.03,row 0
+rows.chances.GOLD.to,0.03,saturation row (TBD)
+
+# --- Boss ---
+boss.period,TBD,K: boss and checkpoint every K rows (GDD 3.2)
+boss.arenaRows,2,rows occupied by arena
+boss.hpMultiplier.from,1.2,elder hp as multiple of player hp at first boss (DR snapshot)
+boss.hpMultiplier.slope,TBD,growth per boss
+
+# --- Arena (snapshot from DR, no ammo, no bonuses) ---
+arena.hpLowThreshold,0.5,
+arena.hpHighThreshold,0.75,
+arena.supply.energy,1,energy cells guaranteed on player row
+arena.chances.ATTACK_CELL.base,0.20,
+arena.chances.ATTACK_CELL.hpLow,0.10,
+arena.chances.ATTACK_CELL.hpHigh,0.30,
+arena.chances.HEAL.base,0.25,
+arena.chances.HEAL.hpLow,0.35,
+arena.chances.HEAL.hpHigh,0.15,
+arena.chances.ENERGY.playerRow,0.14,player row only
+
+# --- Camp ---
+camp.pricePercent,TBD,percent of current gold to set up camp (GDD 8.1)
+camp.payPercent,TBD,percent of current gold paid per turn after leaving camp (GDD 8.3)
+camp.payTurns,TBD,turns of payment after leaving camp
+
+# --- Memory ---
+memory.W,TBD,rows kept around current row in memory (GDD 3.1)
+
+# --- Timing (ms, snapshot from DR) ---
+timing.move_ms,250,
+timing.poke_ms,100,
+timing.death_ms,700,
+timing.lunge_ms,150,
+timing.shot_ms,100,
+
+# --- Layout ---
+layout.columns,5,
+layout.logicalWidth,720,
+layout.logicalHeight,1280,
+
+# --- Upgrades (5 tracks, snapshot from DR) ---
+upgrades.hp.label,MIGHT
+upgrades.hp.effect,5,added to max hp per level
+upgrades.hp.base,20,price of first level
+upgrades.hp.step,10,price growth per level
+upgrades.energy.label,VIGOUR
+upgrades.energy.effect,2,added to max energy per level
+upgrades.energy.base,15,price of first level
+upgrades.energy.step,8,price growth per level
+upgrades.weaponDamage.label,BOLT POWER
+upgrades.weaponDamage.effect,1,added to weapon damage per level
+upgrades.weaponDamage.base,25,price of first level
+upgrades.weaponDamage.step,12,price growth per level
+upgrades.maxAmmo.label,QUIVER
+upgrades.maxAmmo.effect,1,added to max charges per level
+upgrades.maxAmmo.base,30,price of first level
+upgrades.maxAmmo.step,15,price growth per level
+upgrades.energyPerCell.label,SIPHON
+upgrades.energyPerCell.effect,2,added to energy per energy cell
+upgrades.energyPerCell.base,20,price of first level
+upgrades.energyPerCell.step,10,price growth per level

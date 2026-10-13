@@ -1,0 +1,18 @@
+[project]
+title = Dungeon Card Crawler
+version = 0.1.0
+write_log_file = Debug
+
+[bootstrap]
+main_collection = /main/main.collectionc
+
+[display]
+width = 720
+height = 1280
+high_dpi = 1
+dynamic_orientation = 0
+update_frequency = 60
+swap_interval = 1
+
+[input]
+use_accelerometer = 0
