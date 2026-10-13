@@ -24,3 +24,6 @@ use_accelerometer = 0
 
 [label]
 max_count = 512
+
+[sprite]
+max_count = 512

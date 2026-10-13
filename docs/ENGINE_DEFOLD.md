@@ -65,6 +65,7 @@
 - Встроенные ресурсы: builtins — это builtins.zip внутри установки Defold (C:\Users\<user>\AppData\Local\Defold\unpack\<версия>\builtins\builtins.zip). Пути проверять по нему. Шрифт по умолчанию: /builtins/fonts/default.font (system_font.font в 1.14 не существует).
 - require: Defold ищет только a/b.lua для require("a.b"). Файл a/b/init.lua НЕ подхватывается (ошибка "/core/registry.lua could not be found"). Модуль-папку подключать явно: require("core.registry.init"). Проверка: python tools/check_requires.py.
 - Лимит меток: каждый label-компонент занимает слот. По умолчанию [label] max_count = 64, и экран мира (≈66 клеток) его превышает. Значение задано в game.project: [label] max_count = 512. Удаление через go.delete отложенное, поэтому буфер нужен с запасом.
+- Лимит спрайтов: [sprite] max_count по умолчанию 128. Экран мира создаёт ≈66 клеток с подложкой, поэтому задано 512. Ошибка в консоли: "Sprite could not be created since the buffer is full".
 - Устаревшее: label.set_text (предупреждение GAMESYS). Использовать go.set("#label", "text", value).
 - Уже проверено в 1.14.0: у label нет полей text_leading, text_tracking, align, blend_mode; у gui нет значений ADJUST_FIT, ADJUST_STRETCH.
 
