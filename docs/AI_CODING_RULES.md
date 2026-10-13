@@ -180,6 +180,15 @@ core/  ──▶  core/data/   (больше никуда)
 
 ---
 
+## 13a. Кодировка и формат файлов (обязательно)
+
+- Все текстовые файлы: UTF-8 **без BOM**, перевод строки LF в репозитории.
+- Defold падает на BOM: `Expected identifier. Found '﻿'`. Поэтому при создании файла через PowerShell не использовать `Set-Content -Encoding UTF8` и `[Text.Encoding]::UTF8` (они пишут BOM). Записывать через `[IO.File]::WriteAllText(path, text, New-Object Text.UTF8Encoding($false))`.
+- После любой записи файлов Defold-формата выполнять `python tools/check_defold_files.py`. Код возврата 1 — файл не коммитить.
+- Тексты, которые видит игрок, — только английский (правило 9).
+
+---
+
 ## 14. Что нельзя делать
 
 - Править файлы в `build/`, `.internal/`, сгенерированные `*.projectc`, `*.collectionc`, `*.goc`.

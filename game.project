@@ -3,7 +3,7 @@ title = Dungeon Card Crawler
 version = 0.1.0
 
 [bootstrap]
-main_collection = /main/main.collectionc
+main_collection = /collections/world.collectionc
 
 [display]
 width = 720
