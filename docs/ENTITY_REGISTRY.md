@@ -67,7 +67,7 @@ return M
 | `visibility` | нет | `"visible"` (по умолчанию) или `"hidden"` (открыто: скрытые ловушки, §19 бэклога) |
 | параметры | по необходимости | из CSV: `amount`, `value`, `damage` |
 
-Текущие клетки: EMPTY, WALL, HEAL, AMMO (открыто, §GDD 20.5), ENERGY, GOLD, ENEMY, ATTACK_CELL, CAMP.
+Текущие клетки: EMPTY, WALL, HEAL, ENERGY, GOLD, ENEMY, ATTACK_CELL, CAMP. Клетки AMMO удалены (GDD §3.4).
 
 Будущие (бэклог): ловушка, ключ, сундук, клетка NPC.
 
