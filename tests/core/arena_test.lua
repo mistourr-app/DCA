@@ -1,4 +1,5 @@
 local arena = require("core.arena")
+local boss_ai = require("core.ai.boss_default")
 local equipment = require("core.equipment")
 local rng = require("core.rng")
 local balance = require("core.data.balance")
@@ -116,16 +117,16 @@ M["attack cell on the player row hits the boss and passes the turn"] = function(
 end
 
 M["boss profile follows hp fraction"] = function(t)
-	t.equal(arena.profile(100, 100), "aggressive", ">60%")
-	t.equal(arena.profile(50, 100), "balanced", "25-60%")
-	t.equal(arena.profile(20, 100), "defensive", "<=25%")
+	t.equal(boss_ai.profile(100, 100), "aggressive", ">60%")
+	t.equal(boss_ai.profile(50, 100), "balanced", "25-60%")
+	t.equal(boss_ai.profile(20, 100), "defensive", "<=25%")
 end
 
 M["boss does not return to its previous column when it has alternatives"] = function(t)
 	local a = new_fight(20, 20)
 	a.boss_x = 2
 	a.prev_boss_x = 1
-	local moves = arena.boss_moves(a)
+	local moves = boss_ai.moves(a)
 	for _, x in ipairs(moves) do
 		t.true_(x ~= 1, "предыдущая колонка исключена")
 	end
@@ -134,7 +135,7 @@ end
 M["boss turn stays inside the board"] = function(t)
 	local a = new_fight(20, 20)
 	a.boss_x = 0
-	for _, x in ipairs(arena.boss_moves(a)) do
+	for _, x in ipairs(boss_ai.moves(a)) do
 		t.true_(x >= 0 and x < COLUMNS, "колонка в поле")
 	end
 end
@@ -150,10 +151,10 @@ M["boss hits the player when it steps onto an attack cell in the player column"]
 	-- клетка атаки только в колонке игрока; босс идёт на неё из колонки 1
 	a.boss_row[2] = { type = "ATTACK_CELL", damage = 5 }
 	-- форсируем выбор: в колонке 2 атака, соседние пусты
-	local orig = arena.boss_choose
-	arena.boss_choose = function() return 2 end
+	local orig = boss_ai.choose
+	boss_ai.choose = function() return 2 end
 	local ev = arena.boss_turn(a)
-	arena.boss_choose = orig
+	boss_ai.choose = orig
 	local hit = false
 	for _, e in ipairs(ev) do
 		if e.type == "boss_attack" then

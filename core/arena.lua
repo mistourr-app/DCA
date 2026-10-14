@@ -18,6 +18,7 @@
 local balance = require("core.data.balance")
 local grid = require("core.grid")
 local equipment = require("core.equipment")
+local boss_ai = require("core.ai.boss_default")
 
 local M = {}
 
@@ -92,77 +93,11 @@ function M.new(player_x, player_hp, player_max, boss_number, player_row, boss_ro
 	}
 end
 
--- AI босса: профиль по HP-доле (GDD §12.5).
-function M.profile(boss_hp, boss_max)
-	local frac = boss_hp / boss_max
-	if frac > 0.6 then
-		return "aggressive"
-	elseif frac > 0.25 then
-		return "balanced"
-	end
-	return "defensive"
-end
-
--- Допустимые ходы босса по X: ±1 от текущей позиции, в пределах поля.
--- Возврат на предыдущую клетку запрещён, если есть альтернативы (GDD §12.5).
-function M.boss_moves(a)
-	local out = {}
-	for dx = -1, 1 do
-		local nx = a.boss_x + dx
-		if dx ~= 0 and nx >= 0 and nx < COLUMNS then
-			table.insert(out, nx)
-		end
-	end
-	if #out > 1 and a.prev_boss_x ~= nil then
-		local filtered = {}
-		for _, nx in ipairs(out) do
-			if nx ~= a.prev_boss_x then
-				table.insert(filtered, nx)
-			end
-		end
-		if #filtered > 0 then
-			out = filtered
-		end
-	end
-	return out
-end
-
--- Оценка клетки для AI: атака/бонус предпочтительнее лечения при агрессивном профиле и наоборот.
-local function cell_score(profile, cell, player_x, x)
-	local score = 0
-	if cell.type == "ATTACK_CELL" then
-		score = profile == "aggressive" and 3 or (profile == "balanced" and 2 or 1)
-	elseif cell.type == "HEAL" then
-		score = profile == "defensive" and 3 or 0
-	end
-	if profile == "defensive" and x == player_x then
-		score = score - 2
-	end
-	return score
-end
-
--- Ход босса: выбирает колонку по профилю. Возвращает новый x.
-function M.boss_choose(a, rng_g)
-	local moves = M.boss_moves(a)
-	if #moves == 0 then
-		return a.boss_x
-	end
-	local profile = M.profile(a.boss_hp, a.boss_max)
-	local best, best_score = nil, nil
-	for _, x in ipairs(moves) do
-		local s = cell_score(profile, a.boss_row[x] or { type = "EMPTY" }, a.player_x, x)
-		if best_score == nil or s > best_score then
-			best, best_score = x, s
-		end
-	end
-	return best
-end
-
 -- Ход босса: перемещение и (если на клетке атаки) удар по игроку. Возврат ход игроку.
 -- Урон босса = его текущий HP (GDD §5.3 для атаки, согласованно с врагами).
 function M.boss_turn(a)
 	local events = {}
-	local new_x = M.boss_choose(a, nil)
+	local new_x = boss_ai.choose(a)
 	a.prev_boss_x = a.boss_x
 	a.boss_x = new_x
 	local cell = a.boss_row[new_x] or { type = "EMPTY" }
