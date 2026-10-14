@@ -124,7 +124,8 @@ function M.step(run, x, y)
 	table.insert(events, { type = "move", from = pos, to = { x = x, y = y }, cost = cost })
 
 	-- [5] взаимодействие с клеткой
-	local cell = run.get_row(y)[x]
+	-- Отсутствующая клетка (например, ряд арены без клеток) считается пустой.
+	local cell = (run.get_row(y) or {})[x] or { type = "EMPTY" }
 	for _, e in ipairs(interact(run, cell, x, y)) do
 		table.insert(events, e)
 	end

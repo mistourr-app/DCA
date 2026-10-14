@@ -310,6 +310,19 @@ end
 -- Ход на клетку / бой / выстрел только в режиме WORLD.
 local function world_action(self, action_type, x, row)
 	local events, ok
+	-- Шаг на нижний ряд арены: игрок встаёт на него и входит в бой. Обычные клетки там не используются.
+	if action_type == "step" and is_arena_bottom(row) then
+		local moved, reason = world.move(self.world, { x = x, y = row })
+		if not moved then
+			print("refused: " .. tostring(reason))
+			return
+		end
+		self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
+		enter_arena(self)
+		sync_hud(self)
+		refresh(self)
+		return
+	end
 	if action_type == "step" then
 		ok, events = run.step(self.run, x, row)
 	elseif action_type == "melee" then

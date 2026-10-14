@@ -122,6 +122,12 @@ M["new row resets the shot flag and ticks recharge"] = function(t)
 	t.true_(not r.player.weapon.fired_this_row, "флаг выстрела сброшен на новом ряду")
 end
 
+M["step onto a row with no cells does not crash"] = function(t)
+	local r = make({ [1] = {} }, 10)
+	local ok = run.step(r, 2, 1)
+	t.true_(ok, "ход на ряд без клеток не падает")
+end
+
 M["a turn that is refused does not tick recharge"] = function(t)
 	local r = make({ [1] = { [2] = { type = "WALL" } } }, 10)
 	equipment.use(r.player.weapon)
