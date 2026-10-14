@@ -55,16 +55,25 @@ end
 M["shot does not end the turn and is allowed once"] = function(t)
 	local a = new_fight(20, 20)
 	local w = equipment.new(3, 5)
-	local ok = arena.shoot(a, w, 3)
+	local ok = arena.shoot(a, w, 3, 3)
 	t.true_(ok, "первый выстрел")
 	t.equal(a.turn, "player", "ход не передан")
-	t.true_(not arena.shoot(a, w, 3), "второй выстрел в этом ходу запрещён")
+	t.true_(not arena.shoot(a, w, 3, 3), "второй выстрел в этом ходу запрещён")
+end
+
+M["shot is refused when the boss is out of range"] = function(t)
+	local a = new_fight(20, 20)
+	a.player_x = 0
+	a.boss_x = 4
+	local ok, reason = arena.shoot(a, equipment.new(3, 5), 3, 3)
+	t.true_(not ok, "дальше дальности")
+	t.true_(reason ~= nil, "есть причина")
 end
 
 M["shot damages the boss"] = function(t)
 	local a = new_fight(20, 20)
 	local before = a.boss_hp
-	arena.shoot(a, equipment.new(3, 5), 3)
+	arena.shoot(a, equipment.new(3, 5), 3, 3)
 	t.equal(a.boss_hp, before - 3, "урон оружия")
 end
 

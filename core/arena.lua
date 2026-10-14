@@ -177,12 +177,16 @@ function M.boss_turn(a)
 end
 
 -- Выстрел из арбалета по боссу: не завершает ход, один за ход. Урон — оружия.
-function M.shoot(a, weapon, damage)
+-- range — дальность оружия в клетках (по колонкам, GDD §5.1).
+function M.shoot(a, weapon, damage, range)
 	if a.turn ~= "player" then
 		return false, "Not your turn"
 	end
 	if a.fired then
 		return false, "Already fired this turn"
+	end
+	if math.abs(a.boss_x - a.player_x) > range then
+		return false, "Boss out of range"
 	end
 	local ok, reason = equipment.fire(weapon)
 	if not ok then
@@ -203,6 +207,8 @@ function M.player_move(a, x)
 		return false, "Move only to an adjacent column"
 	end
 	a.player_x = x
+	-- Перемещение или атака клеткой передают ход боссу (GDD §12.2).
+	a.turn = "boss"
 	local events = { { type = "player_move", x = x } }
 	local cell = a.player_row[x] or { type = "EMPTY" }
 	if cell.type == "HEAL" then

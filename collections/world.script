@@ -15,6 +15,9 @@ local save_schema = require("core.save_schema")
 local registry = require("core.registry.init")
 local balance = require("core.data.balance")
 local saves = require("scripts.saves")
+local arena = require("core.arena")
+local rng = require("core.rng")
+local row_seed = require("core.row_seed")
 
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
@@ -73,26 +76,52 @@ local function spawn(self, x, row, text, color, ink)
 	table.insert(self.ids, id)
 end
 
--- Перерисовка окна рядов вокруг игрока.
+-- Нижний ряд арены (ряд игрока): ряд типа boss с остатком периода (PERIOD - ARENA_ROWS).
+local PERIOD = balance.boss.period
+local ARENA_ROWS = balance.boss.arenaRows
+
+local function is_arena_bottom(y)
+	return row_gen.kind(y) == "boss" and (y % PERIOD) == (PERIOD - ARENA_ROWS)
+end
+
+-- Перерисовка окна рядов вокруг игрока. В режиме BOSS два нижних ряда — это арена.
 local function refresh(self)
 	clear_cells(self)
 	local pr = self.world.pos.y
+	local a = self.arena
+	local boss_mode = self.world.mode == MODES.BOSS and a ~= nil
 	-- Видны только ряд игрока и ряды над ним; остальные — туман войны (не рисуются).
 	for _, k in ipairs(layout.visible_offsets()) do
 		local row = pr + k
-		local cells = get_row(self, row)
+		local cells
+		if boss_mode and k == 0 then
+			cells = a.player_row
+		elseif boss_mode and k == 1 then
+			cells = a.boss_row
+		else
+			cells = get_row(self, row)
+		end
 		for x = 0, layout.COLUMNS - 1 do
 			local c = cells[x] or { type = "EMPTY" }
 			local sym = SYMBOL[c.type] or SYMBOL.EMPTY
 			local text = sym.text
+			local fill, ink = sym.fill, sym.ink
 			if c.type == "ENEMY" then
 				local t = registry.enemies.types[c.enemy]
 				text = t.label:sub(1, 1) .. tostring(c.hp or t.base_hp)
 			end
-			spawn(self, x, row, text, sym.fill, sym.ink)
+			if boss_mode and k == 0 and x == a.player_x then
+				text, fill, ink = PLAYER.text, PLAYER.fill, PLAYER.ink
+			elseif boss_mode and k == 1 and x == a.boss_x then
+				text = "B" .. tostring(a.boss_hp)
+				fill, ink = SYMBOL.ENEMY.fill, SYMBOL.ENEMY.ink
+			end
+			spawn(self, x, row, text, fill, ink)
 		end
 	end
-	spawn(self, self.world.pos.x, pr, PLAYER.text, PLAYER.fill, PLAYER.ink)
+	if not boss_mode then
+		spawn(self, self.world.pos.x, pr, PLAYER.text, PLAYER.fill, PLAYER.ink)
+	end
 end
 
 -- Текст HUD и кнопки внизу экрана.
@@ -109,6 +138,8 @@ local function sync_hud(self)
 		bottom = "LEAVE CAMP"
 	elseif self.world.mode == MODES.WORLD then
 		bottom = string.format("MAKE CAMP (%d gold)", camp.install_price(p.gold))
+	elseif self.world.mode == MODES.BOSS and self.arena then
+		bottom = string.format("BOSS HP %d/%d", self.arena.boss_hp, self.arena.boss_max)
 	else
 		bottom = ""
 	end
@@ -211,6 +242,71 @@ local function leave_camp(self)
 	sync_hud(self)
 end
 
+-- Вход на арену: создаётся состояние боя, ряды арены генерируются по seed этого ряда.
+local function enter_arena(self)
+	local pos = self.world.pos
+	local boss_number = (pos.y + ARENA_ROWS) / PERIOD
+	local g = rng.new(row_seed.row_seed(self.seed, self.world.respawn_count, pos.y))
+	local frac = self.player.hp / self.player.max_hp
+	local pr, br = arena.generate_rows(g, arena.player_row_chances(frac))
+	self.arena = arena.new(pos.x, self.player.hp, self.player.max_hp, boss_number, pr, br)
+	world.transition(self.world, MODES.BOSS)
+	print("arena " .. boss_number .. " started at row " .. pos.y)
+end
+
+-- Исход боя: победа — чекпоинт выше арены, поражение — смерть.
+local function arena_outcome(self)
+	local res = arena.result(self.arena)
+	if res == "victory" then
+		world.boss_victory(self.world)
+		self.arena = nil
+		print("boss defeated, checkpoint at row " .. self.world.pos.y)
+		save(self)
+	elseif res == "defeat" then
+		self.player.hp = 0
+		self.arena = nil
+		world.transition(self.world, MODES.DEATH)
+		print("defeated by boss")
+	end
+	return res
+end
+
+-- Ход в бою: перемещение или атака клеткой, затем ход босса (если бой продолжается).
+local function arena_move(self, x)
+	local a = self.arena
+	local ok, events = arena.player_move(a, x)
+	if not ok then
+		print("refused: " .. events)
+		return
+	end
+	if arena.result(a) == nil then
+		local boss_events = arena.boss_turn(a)
+		for _, e in ipairs(boss_events) do
+			table.insert(events, e)
+		end
+	end
+	self.player.hp = a.player_hp
+	self.world.pos.x = a.player_x
+	arena_outcome(self)
+	sync_hud(self)
+	refresh(self)
+end
+
+local function arena_shoot(self)
+	local a = self.arena
+	local range = registry.equipment.CROSSBOW.range
+	local ok, res = arena.shoot(a, self.player.weapon, self.player.weapon_damage, range)
+	if not ok then
+		print("refused: " .. tostring(res))
+		return
+	end
+	if arena.result(a) == "victory" then
+		arena_outcome(self)
+	end
+	sync_hud(self)
+	refresh(self)
+end
+
 -- Ход на клетку / бой / выстрел только в режиме WORLD.
 local function world_action(self, action_type, x, row)
 	local events, ok
@@ -228,6 +324,9 @@ local function world_action(self, action_type, x, row)
 		if row_gen.kind(pos.y) == "checkpoint" and pos.y > self.world.return_point.row then
 			world.set_return_point(self.world, "checkpoint", pos.y, pos.x)
 			save(self)
+		end
+		if is_arena_bottom(pos.y) then
+			enter_arena(self)
 		end
 	end
 	sync_hud(self)
@@ -300,10 +399,22 @@ function on_input(self, action_id, action)
 		end
 		return true
 	end
+	local x, row = layout.cell_at(action.x, action.y, self.world.pos.y)
+	if mode == MODES.BOSS and self.arena then
+		if x == nil then
+			return true
+		end
+		local a = self.arena
+		if row == self.world.pos.y and math.abs(x - a.player_x) == 1 then
+			arena_move(self, x)
+		elseif row == self.world.pos.y + 1 and x == a.boss_x then
+			arena_shoot(self)
+		end
+		return true
+	end
 	if mode ~= MODES.WORLD then
 		return true
 	end
-	local x, row = layout.cell_at(action.x, action.y, self.world.pos.y)
 	if x == nil then
 		return true
 	end
