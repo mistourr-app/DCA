@@ -43,6 +43,32 @@ M["taps outside the field return nil"] = function(t)
 	t.equal(layout.cell_at(10, layout.HEIGHT - 5, 0), nil, "над полем (HUD)")
 end
 
+M["arena row is exactly twice a normal row"] = function(t)
+	t.equal(layout.ARENA_H, layout.CELL_H * 2, "высота ряда арены вдвое больше обычной")
+	t.equal(layout.ARENA_H, layout.CELL_H * layout.ARENA_SCALE, "коэффициент из design.csv")
+end
+
+M["two arena rows fill the whole field between the margins"] = function(t)
+	local field = layout.HEIGHT - layout.MARGIN_TOP - layout.MARGIN_BOTTOM
+	t.equal(layout.ARENA_H * 2, field, "два ряда арены занимают всё поле")
+	t.equal(layout.arena_row_y(0) - layout.ARENA_H / 2, layout.MARGIN_BOTTOM, "нижний ряд начинается у нижнего отступа")
+end
+
+M["tap in the arena rows resolves to the player or boss row"] = function(t)
+	for x = 0, layout.COLUMNS - 1 do
+		local cx, k0 = layout.arena_cell_at(layout.cell_x(x), layout.arena_row_y(0))
+		t.equal(cx, x, "колонка")
+		t.equal(k0, 0, "нижний ряд — ряд игрока")
+		local _, k1 = layout.arena_cell_at(layout.cell_x(x), layout.arena_row_y(1))
+		t.equal(k1, 1, "верхний ряд — ряд босса")
+	end
+end
+
+M["taps outside the arena field resolve to nil"] = function(t)
+	t.equal(layout.arena_cell_at(10, layout.MARGIN_BOTTOM - 5), nil, "под полем")
+	t.equal(layout.arena_cell_at(10, layout.HEIGHT - 5), nil, "над полем")
+end
+
 M["visible offsets are 0..three"] = function(t)
 	local offs = layout.visible_offsets()
 	t.equal(#offs, 4, "четыре ряда")

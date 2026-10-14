@@ -65,14 +65,15 @@ local function clear_cells(self)
 	self.ids = {}
 end
 
-local function spawn(self, x, row, text, color, ink)
-	local pos = vmath.vector3(layout.cell_x(x), layout.cell_y(row, self.world.pos.y), 0)
+-- Клетка с центром (cx, cy) и высотой h. В бою высота вдвое больше обычной (арена на весь экран).
+local function spawn(self, cx, cy, h, text, color, ink)
+	local pos = vmath.vector3(cx, cy, 0)
 	local id = factory.create("#cell_factory", pos)
 	if id == nil then
 		print("cell spawn failed: label buffer full (raise [label] max_count in game.project)")
 		return
 	end
-	msg.post(id, "set", { text = text, color = color, text_color = ink, width = layout.CELL_W - 8, height = layout.CELL_H - 8 })
+	msg.post(id, "set", { text = text, color = color, text_color = ink, width = layout.CELL_W - 8, height = h - 8 })
 	table.insert(self.ids, id)
 end
 
@@ -89,39 +90,42 @@ local function refresh(self)
 	clear_cells(self)
 	local pr = self.world.pos.y
 	local a = self.arena
-	local boss_mode = self.world.mode == MODES.BOSS and a ~= nil
-	-- Видны только ряд игрока и ряды над ним; остальные — туман войны (не рисуются).
-	for _, k in ipairs(layout.visible_offsets()) do
-		local row = pr + k
-		local cells
-		if boss_mode and k == 0 then
-			cells = a.player_row
-		elseif boss_mode and k == 1 then
-			cells = a.boss_row
-		else
-			cells = get_row(self, row)
+	if self.world.mode == MODES.BOSS and a ~= nil then
+		-- Бой: два ряда арены на всё поле, обычные ряды не показываются.
+		for k = 0, 1 do
+			local cells = (k == 0) and a.player_row or a.boss_row
+			local cy = layout.arena_row_y(k)
+			for x = 0, layout.COLUMNS - 1 do
+				local c = cells[x] or { type = "EMPTY" }
+				local sym = SYMBOL[c.type] or SYMBOL.EMPTY
+				local text, fill, ink = sym.text, sym.fill, sym.ink
+				if k == 0 and x == a.player_x then
+					text, fill, ink = PLAYER.text, PLAYER.fill, PLAYER.ink
+				elseif k == 1 and x == a.boss_x then
+					text = "B" .. tostring(a.boss_hp)
+					fill, ink = SYMBOL.ENEMY.fill, SYMBOL.ENEMY.ink
+				end
+				spawn(self, layout.cell_x(x), cy, layout.ARENA_H, text, fill, ink)
+			end
 		end
+		return
+	end
+	-- Обычный режим: видны ряд игрока и ряды над ним; остальные — туман войны (не рисуются).
+	for _, k in ipairs(layout.visible_offsets()) do
+		local cells = get_row(self, pr + k)
+		local cy = layout.row_y(k)
 		for x = 0, layout.COLUMNS - 1 do
 			local c = cells[x] or { type = "EMPTY" }
 			local sym = SYMBOL[c.type] or SYMBOL.EMPTY
 			local text = sym.text
-			local fill, ink = sym.fill, sym.ink
 			if c.type == "ENEMY" then
 				local t = registry.enemies.types[c.enemy]
 				text = t.label:sub(1, 1) .. tostring(c.hp or t.base_hp)
 			end
-			if boss_mode and k == 0 and x == a.player_x then
-				text, fill, ink = PLAYER.text, PLAYER.fill, PLAYER.ink
-			elseif boss_mode and k == 1 and x == a.boss_x then
-				text = "B" .. tostring(a.boss_hp)
-				fill, ink = SYMBOL.ENEMY.fill, SYMBOL.ENEMY.ink
-			end
-			spawn(self, x, row, text, fill, ink)
+			spawn(self, layout.cell_x(x), cy, layout.CELL_H, text, sym.fill, sym.ink)
 		end
 	end
-	if not boss_mode then
-		spawn(self, self.world.pos.x, pr, PLAYER.text, PLAYER.fill, PLAYER.ink)
-	end
+	spawn(self, layout.cell_x(self.world.pos.x), layout.row_y(0), layout.CELL_H, PLAYER.text, PLAYER.fill, PLAYER.ink)
 end
 
 -- Текст HUD и кнопки внизу экрана.
@@ -412,19 +416,21 @@ function on_input(self, action_id, action)
 		end
 		return true
 	end
-	local x, row = layout.cell_at(action.x, action.y, self.world.pos.y)
 	if mode == MODES.BOSS and self.arena then
+		-- В бою тап разбирается по двум высоким рядам арены: k = 0 — ряд игрока, k = 1 — ряд босса.
+		local x, k = layout.arena_cell_at(action.x, action.y)
 		if x == nil then
 			return true
 		end
 		local a = self.arena
-		if row == self.world.pos.y and math.abs(x - a.player_x) == 1 then
+		if k == 0 and math.abs(x - a.player_x) == 1 then
 			arena_move(self, x)
-		elseif row == self.world.pos.y + 1 and x == a.boss_x then
+		elseif k == 1 and x == a.boss_x then
 			arena_shoot(self)
 		end
 		return true
 	end
+	local x, row = layout.cell_at(action.x, action.y, self.world.pos.y)
 	if mode ~= MODES.WORLD then
 		return true
 	end

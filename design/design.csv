@@ -8,6 +8,7 @@ screen.height,1280,logical height
 screen.visibleRows,4,rows shown: current row plus rows ahead; the rest is fog of war (GDD 5)
 screen.marginTop,100,space above the field for HUD
 screen.marginBottom,120,space below the field for the camp button
+screen.arenaRowScale,2,height of one arena row relative to a normal row; the two arena rows fill the field
 
 # --- Animation durations (ms) ---
 anim.move_ms,250,

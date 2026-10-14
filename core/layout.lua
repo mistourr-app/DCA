@@ -1,12 +1,13 @@
 -- Геометрия экрана: клетки поля <-> логические координаты (GDD §2, docs/ARCHITECTURE.md §7).
--- Чистая логика. Логическое разрешение 720x1280 (design/design.csv, раздел screen.*), начало координат снизу слева.
+-- Чистая логика. Логическое разрешение 720x1280 (design/design.csv, раздел screen.*),
+-- начало координат снизу слева.
 --
--- Видимы VISIBLE_ROWS рядов: ряд игрока (k = 0, внизу поля) и ряды над ним (k = 1..VISIBLE_ROWS-1).
--- Остальные ряды не рисуются (туман войны). Клетки растянуты по высоте, чтобы поле занимало
--- экран между MARGIN_BOTTOM и HEIGHT - MARGIN_TOP.
+-- Обычный режим: видны VISIBLE_ROWS рядов (ряд игрока внизу и ряды над ним), высота ряда CELL_H.
+-- Режим боя на арене: видны только два ряда арены (ряд игрока и ряд босса). Высота каждого
+-- ряда арены ARENA_H = CELL_H * arenaRowScale, поэтому два ряда занимают всё поле.
 
-local balance = require("core.data.balance")
 local design = require("core.data.design")
+local balance = require("core.data.balance")
 
 local M = {}
 
@@ -16,9 +17,11 @@ M.HEIGHT = design.screen.height
 M.VISIBLE_ROWS = design.screen.visibleRows
 M.MARGIN_TOP = design.screen.marginTop
 M.MARGIN_BOTTOM = design.screen.marginBottom
+M.ARENA_SCALE = design.screen.arenaRowScale
 
 M.CELL_W = math.floor(M.WIDTH / M.COLUMNS)
 M.CELL_H = math.floor((M.HEIGHT - M.MARGIN_TOP - M.MARGIN_BOTTOM) / M.VISIBLE_ROWS)
+M.ARENA_H = M.CELL_H * M.ARENA_SCALE
 
 -- Центр клетки колонки x по горизонтали.
 function M.cell_x(x)
@@ -55,7 +58,31 @@ function M.cell_at(px, py, player_row)
 	return x, player_row + k
 end
 
--- Смещения рядов, которые видны: от ряда игрока вверх. Ряды вне этого диапазона — туман.
+-- Режим арены: два ряда по высоте ARENA_H. k = 0 — ряд игрока (внизу), k = 1 — ряд босса.
+function M.arena_row_y(k)
+	return M.MARGIN_BOTTOM + k * M.ARENA_H + M.ARENA_H / 2
+end
+
+-- Клетка арены под точкой (px, py). Возвращает x, k (0 — ряд игрока, 1 — ряд босса) или nil.
+function M.arena_cell_at(px, py)
+	if px < 0 or px >= M.WIDTH then
+		return nil
+	end
+	if py < M.MARGIN_BOTTOM or py >= M.HEIGHT - M.MARGIN_TOP then
+		return nil
+	end
+	local x = math.floor(px / M.CELL_W)
+	if x < 0 or x >= M.COLUMNS then
+		return nil
+	end
+	local k = math.floor((py - M.MARGIN_BOTTOM) / M.ARENA_H)
+	if k < 0 or k > 1 then
+		return nil
+	end
+	return x, k
+end
+
+-- Смещения рядов, которые видны в обычном режиме: от ряда игрока вверх. Остальное — туман войны.
 function M.visible_offsets()
 	local out = {}
 	for k = 0, M.VISIBLE_ROWS - 1 do
