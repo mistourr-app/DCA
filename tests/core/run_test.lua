@@ -164,7 +164,20 @@ M["melee kills a weak enemy and leaves the player unhurt"] = function(t)
 	t.true_(has(events, "enemy_dead") ~= nil, "враг мёртв")
 	t.equal(r.get_row(1)[2].type, "EMPTY", "клетка опустела")
 	t.equal(r.player.hp, 10, "враг не ответил: погиб от первого удара")
-	t.equal(r.world.pos.y, 0, "игрок остался на своей клетке (GDD 5.3 п.4)")
+	t.equal(r.world.pos.y, 1, "игрок перешёл на клетку погибшего врага")
+	t.equal(r.world.pos.x, 2, "колонка врага")
+	t.true_(has(events, "move") ~= nil, "есть событие move (тики оплаты лагеря, чекпоинты)")
+end
+
+M["melee death of the player keeps the player in place"] = function(t)
+	local rows = {
+		[0] = { [2] = { type = "EMPTY" } },
+		[1] = { [2] = { type = "ENEMY", enemy = "TYPE_2", hp = 7 } },
+	}
+	local r = make(rows, 3)
+	local _, events = run.melee(r, 2, 1)
+	t.true_(has(events, "death") ~= nil, "игрок погиб")
+	t.equal(r.world.pos.y, 0, "при смерти игрок не перемещается")
 end
 
 M["melee: enemy answers with its remaining hp"] = function(t)

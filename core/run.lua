@@ -180,15 +180,24 @@ function M.melee(run, x, y)
 		hp = player_after,
 	})
 
-	if combat.is_dead(enemy_after) then
-		run.get_row(y)[x] = { type = "EMPTY" }
-		table.insert(events, { type = "enemy_dead", x = x, y = y })
-	else
-		run.get_row(y)[x].hp = enemy_after
-	end
-
 	if combat.is_dead(player_after) then
 		table.insert(events, { type = "death", at = { x = pos.x, y = pos.y } })
+		return true, events
+	end
+
+	if combat.is_dead(enemy_after) then
+		-- Враг погиб, игрок выжил: игрок переходит на клетку врага (GDD §5.3).
+		run.get_row(y)[x] = { type = "EMPTY" }
+		table.insert(events, { type = "enemy_dead", x = x, y = y })
+		local moved, reason = world.move(w, { x = x, y = y })
+		if not moved then
+			table.insert(events, { type = "refused", reason = reason })
+			return true, events
+		end
+		table.insert(events, { type = "move", from = pos, to = { x = x, y = y }, cost = 0 })
+	else
+		-- Враг выжил: игрок остаётся на своей клетке, враг сохраняет остаток HP.
+		run.get_row(y)[x].hp = enemy_after
 	end
 	return true, events
 end
