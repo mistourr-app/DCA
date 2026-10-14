@@ -12,12 +12,15 @@ function M.is_dead(hp)
 	return hp <= 0
 end
 
--- Ближний бой (GDD §5.3, пункт 3): игрок бьёт на свой HP,
--- враг отвечает на свой оставшийся HP.
+-- Ближний бой (GDD §5.3): одновременный обмен ударами.
+-- Игрок наносит врагу урон, равный своему HP; враг наносит игроку урон, равный своему полному HP.
+-- Ровно один погибает:
+--   enemy_hp < player_hp  — враг погибает, игрок теряет enemy_hp и выживает;
+--   иначе                 — игрок погибает (ничья тоже проигрыш игрока), HP врага уменьшается.
 -- Возвращает новые значения: player_hp, enemy_hp.
 function M.melee(player_hp, enemy_hp)
 	local enemy_after = M.apply_damage(enemy_hp, player_hp)
-	local player_after = M.apply_damage(player_hp, enemy_after)
+	local player_after = M.apply_damage(player_hp, enemy_hp)
 	return player_after, enemy_after
 end
 

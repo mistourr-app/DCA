@@ -139,19 +139,19 @@ M["a turn that is refused does not tick recharge"] = function(t)
 end
 
 
-M["melee: player hits for its hp, enemy answers with its rest"] = function(t)
+M["melee: player hits for its hp, enemy hits back for its full hp"] = function(t)
 	local rows = {
 		[0] = { [2] = { type = "EMPTY" } },
 		[1] = { [2] = { type = "ENEMY", enemy = "TYPE_2" } },
 	}
 	local r = make(rows, 3)
-	-- игрок 3 бьёт врага 7 -> остаток 4; враг отвечает 4 -> игрок 3 - 4 — смерть
+	-- игрок 3 против врага 7: игрок бьёт на 3 (враг 4), враг бьёт на 7 (игрок мёртв)
 	local ok, events = run.melee(r, 2, 1)
 	t.true_(ok, "бой прошёл")
 	local p = has(events, "poke")
 	t.equal(p.dealt_to_enemy, 3, "игрок бьёт на свой HP")
 	t.equal(p.enemy_hp, 4, "у врага остаётся 4")
-	t.equal(p.dealt_to_player, 4, "враг отвечает остатком")
+	t.equal(p.dealt_to_player, 7, "враг бьёт на свой полный HP")
 end
 
 M["melee kills a weak enemy and leaves the player unhurt"] = function(t)
@@ -163,7 +163,7 @@ M["melee kills a weak enemy and leaves the player unhurt"] = function(t)
 	local _, events = run.melee(r, 2, 1)
 	t.true_(has(events, "enemy_dead") ~= nil, "враг мёртв")
 	t.equal(r.get_row(1)[2].type, "EMPTY", "клетка опустела")
-	t.equal(r.player.hp, 10, "враг не ответил: погиб от первого удара")
+	t.equal(r.player.hp, 8, "игрок получил 2 урона, равные HP врага")
 	t.equal(r.world.pos.y, 1, "игрок перешёл на клетку погибшего врага")
 	t.equal(r.world.pos.x, 2, "колонка врага")
 	t.true_(has(events, "move") ~= nil, "есть событие move (тики оплаты лагеря, чекпоинты)")
@@ -180,15 +180,16 @@ M["melee death of the player keeps the player in place"] = function(t)
 	t.equal(r.world.pos.y, 0, "при смерти игрок не перемещается")
 end
 
-M["melee: enemy answers with its remaining hp"] = function(t)
+M["melee: stronger enemy kills the player, player stays in place"] = function(t)
 	local rows = {
 		[0] = { [2] = { type = "EMPTY" } },
 		[1] = { [2] = { type = "ENEMY", enemy = "TYPE_2", hp = 7 } },
 	}
-	local r = make(rows, 3)
-	-- игрок 3 бьёт врага 7 -> 4 HP; враг отвечает 4 -> игрок 3-4 = 0 — смерть
+	local r = make(rows, 10)
+	-- игрок 10 против врага 7: враг погибает, игрок жив (проверка правила «сильнее — выживает»)
 	local _, events = run.melee(r, 2, 1)
-	t.true_(has(events, "death") ~= nil, "игрок погибает от ответа")
+	t.true_(has(events, "death") == nil, "сильнейший игрок выживает")
+	t.equal(r.player.hp, 3, "потерял 7 HP")
 end
 
 M["melee refused without enough hp for the approach"] = function(t)

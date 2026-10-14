@@ -175,7 +175,7 @@ function M.melee(run, x, y)
 	table.insert(events, {
 		type = "poke",
 		dealt_to_enemy = player_before,
-		dealt_to_player = enemy_after,
+		dealt_to_player = hp,
 		enemy_hp = enemy_after,
 		hp = player_after,
 	})
