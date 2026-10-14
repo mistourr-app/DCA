@@ -1,0 +1,11 @@
+-- Прямоугольник без надписи: обводка подсветки или точка пунктира. Сообщение "set": width, height, color.
+-- Масштаб — только спрайту, как у клетки (cell.script).
+
+local SPRITE_PX = 32
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set") then
+		go.set("#sprite", "scale", vmath.vector3(message.width / SPRITE_PX, message.height / SPRITE_PX, 1))
+		go.set("#sprite", "tint", message.color)
+	end
+end

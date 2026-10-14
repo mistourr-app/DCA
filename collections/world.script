@@ -16,6 +16,8 @@ local registry = require("core.registry.init")
 local balance = require("core.data.balance")
 local saves = require("scripts.saves")
 local arena = require("core.arena")
+local highlight = require("core.highlight")
+local design = require("core.data.design")
 local rng = require("core.rng")
 local row_seed = require("core.row_seed")
 
@@ -36,6 +38,18 @@ local SYMBOL = {
 	ATTACK_CELL = { text = "A", fill = rgb(196, 0, 20), ink = rgb(255, 255, 255) },
 }
 local PLAYER = { text = "@", fill = rgb(255, 255, 255), ink = rgb(0, 0, 0) }
+
+-- Подсветки (GDD §12): шаг — зелёная, прыжок — фиолетовая, атака — красная, пунктир выстрела — красный.
+local OUTLINE = {
+	step = rgb(16, 185, 129),
+	jump = rgb(158, 109, 255),
+	attack = rgb(255, 31, 31),
+}
+local DOT_COLOR = rgb(255, 31, 31)
+local THREAT_COLOR = {
+	alert = rgb(255, 31, 31),
+	idle = rgb(255, 115, 27),
+}
 local function has_event(events, type_)
 	for _, e in ipairs(events) do
 		if e.type == type_ then
@@ -77,6 +91,46 @@ local function spawn(self, cx, cy, h, text, color, ink)
 	table.insert(self.ids, id)
 end
 
+-- Прямоугольник без надписи (обводка или точка пунктира).
+local function spawn_bar(self, cx, cy, w, h, color)
+	local id = factory.create("#bar_factory", vmath.vector3(cx, cy, 0))
+	if id == nil then
+		print("bar spawn failed: sprite buffer full (raise [sprite] max_count in game.project)")
+		return
+	end
+	msg.post(id, "set", { width = w, height = h, color = color })
+	table.insert(self.ids, id)
+end
+
+-- Обводка клетки: четыре полоски в зазоре между клетками (зазор = 8 px, полоски по 4 px).
+local BORDER = design.screen.borderWidth
+local GAP = 8
+local function draw_outline(self, cx, cy, w, h, color)
+	local ox = (w - GAP) / 2 + BORDER / 2
+	local oy = (h - GAP) / 2 + BORDER / 2
+	spawn_bar(self, cx, cy + oy, w, BORDER, color)
+	spawn_bar(self, cx, cy - oy, w, BORDER, color)
+	spawn_bar(self, cx - ox, cy, BORDER, h, color)
+	spawn_bar(self, cx + ox, cy, BORDER, h, color)
+end
+
+-- Тонкая пунктирная линия от точки (ax, ay) до (bx, by).
+local DASH = design.screen.dashSize
+local function draw_dashed(self, ax, ay, bx, by)
+	for _, p in ipairs(highlight.dash_points(ax, ay, bx, by, highlight.DASH_STEP)) do
+		spawn_bar(self, p.x, p.y, DASH, DASH, DOT_COLOR)
+	end
+end
+
+-- Наложение угрозы на цвет клетки (GDD §5.4): alpha-смешение с красным или оранжевым.
+local function blend(base, color, a)
+	return vmath.vector4(
+		base.x * (1 - a) + color.x * a,
+		base.y * (1 - a) + color.y * a,
+		base.z * (1 - a) + color.z * a,
+		1)
+end
+
 -- Нижний ряд арены (ряд игрока): ряд типа boss с остатком периода (PERIOD - ARENA_ROWS).
 local PERIOD = balance.boss.period
 local ARENA_ROWS = balance.boss.arenaRows
@@ -90,6 +144,7 @@ local function refresh(self)
 	clear_cells(self)
 	local pr = self.world.pos.y
 	local a = self.arena
+	local reach = registry.equipment.CROSSBOW.range
 	if self.world.mode == MODES.BOSS and a ~= nil then
 		-- Бой: два ряда арены на всё поле, обычные ряды не показываются.
 		for k = 0, 1 do
@@ -108,24 +163,52 @@ local function refresh(self)
 				spawn(self, layout.cell_x(x), cy, layout.ARENA_H, text, fill, ink)
 			end
 		end
+		-- Подсветка ходов по X на ряду игрока.
+		for _, m in ipairs(highlight.arena_moves(a)) do
+			draw_outline(self, layout.cell_x(m.x), layout.arena_row_y(0), layout.CELL_W, layout.ARENA_H, OUTLINE[m.kind])
+		end
+		-- Пунктир выстрела по боссу, если выстрел возможен.
+		local boss_x = highlight.arena_shot(a, self.player.weapon, reach)
+		if boss_x ~= nil then
+			local px, py = layout.cell_x(a.player_x), layout.arena_row_y(0)
+			local bx, by = layout.cell_x(boss_x), layout.arena_row_y(1)
+			draw_dashed(self, px, py, bx, by)
+		end
 		return
 	end
 	-- Обычный режим: видны ряд игрока и ряды над ним; остальные — туман войны (не рисуются).
 	for _, k in ipairs(layout.visible_offsets()) do
 		local cells = get_row(self, pr + k)
 		local cy = layout.row_y(k)
+		local threat = highlight.threat(cells, pr + k)
 		for x = 0, layout.COLUMNS - 1 do
 			local c = cells[x] or { type = "EMPTY" }
 			local sym = SYMBOL[c.type] or SYMBOL.EMPTY
 			local text = sym.text
+			local fill = sym.fill
 			if c.type == "ENEMY" then
 				local t = registry.enemies.types[c.enemy]
 				text = t.label:sub(1, 1) .. tostring(c.hp or t.base_hp)
 			end
-			spawn(self, layout.cell_x(x), cy, layout.CELL_H, text, sym.fill, sym.ink)
+			local kind, alpha = highlight.threat_style(threat[x])
+			if kind ~= nil then
+				fill = blend(fill, THREAT_COLOR[kind], alpha)
+			end
+			spawn(self, layout.cell_x(x), cy, layout.CELL_H, text, fill, sym.ink)
 		end
 	end
-	spawn(self, layout.cell_x(self.world.pos.x), layout.row_y(0), layout.CELL_H, PLAYER.text, PLAYER.fill, PLAYER.ink)
+	local py = layout.row_y(0)
+	if self.world.mode == MODES.WORLD then
+		-- Подсветка ходов на следующий ряд (шаг, прыжок, атака по врагу).
+		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, get_row(self, pr + 1))) do
+			draw_outline(self, layout.cell_x(m.x), layout.row_y(1), layout.CELL_W, layout.CELL_H, OUTLINE[m.kind])
+		end
+		-- Пунктир до каждой цели, в которую выстрел возможен.
+		for _, x in ipairs(highlight.shot_targets(self.world.pos, get_row(self, pr), self.player.weapon, reach)) do
+			draw_dashed(self, layout.cell_x(self.world.pos.x), py, layout.cell_x(x), py)
+		end
+	end
+	spawn(self, layout.cell_x(self.world.pos.x), py, layout.CELL_H, PLAYER.text, PLAYER.fill, PLAYER.ink)
 end
 
 -- Текст HUD и кнопки внизу экрана.
