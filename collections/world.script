@@ -56,30 +56,36 @@ go.property("popup_y_factor", 0.2)
 go.property("fall_drop", 0.8)
 
 -- Палитра (GDD §16, фоны клеток): фон (fill) и цвет подписи (ink) каждого типа карты.
-go.property("color_empty_fill", vmath.vector4(26 / 255, 29 / 255, 40 / 255, 1))
-go.property("color_empty_ink", vmath.vector4(26 / 255, 29 / 255, 40 / 255, 1))
-go.property("color_wall_fill", vmath.vector4(63 / 255, 69 / 255, 86 / 255, 1))
-go.property("color_wall_ink", vmath.vector4(160 / 255, 166 / 255, 180 / 255, 1))
-go.property("color_heal_fill", vmath.vector4(16 / 255, 185 / 255, 129 / 255, 1))
+-- Дефолты go.property — только литералы: значения уже пересчитаны из палитры GDD (hex/255).
+go.property("color_empty_fill", vmath.vector4(0.102, 0.114, 0.157, 1))
+go.property("color_empty_ink", vmath.vector4(0.102, 0.114, 0.157, 1))
+go.property("color_wall_fill", vmath.vector4(0.247, 0.271, 0.337, 1))
+go.property("color_wall_ink", vmath.vector4(0.627, 0.651, 0.706, 1))
+go.property("color_heal_fill", vmath.vector4(0.063, 0.725, 0.506, 1))
 go.property("color_heal_ink", vmath.vector4(0, 0, 0, 1))
-go.property("color_gold_fill", vmath.vector4(1, 231 / 255, 97 / 255, 1))
+go.property("color_gold_fill", vmath.vector4(1, 0.906, 0.38, 1))
 go.property("color_gold_ink", vmath.vector4(0, 0, 0, 1))
-go.property("color_enemy_fill", vmath.vector4(1, 31 / 255, 31 / 255, 1))
+go.property("color_enemy_fill", vmath.vector4(1, 0.122, 0.122, 1))
 go.property("color_enemy_ink", vmath.vector4(1, 1, 1, 1))
-go.property("color_camp_fill", vmath.vector4(92 / 255, 250 / 255, 1, 1))
+go.property("color_camp_fill", vmath.vector4(0.361, 0.98, 1, 1))
 go.property("color_camp_ink", vmath.vector4(0, 0, 0, 1))
-go.property("color_attack_fill", vmath.vector4(196 / 255, 0, 20 / 255, 1))
+go.property("color_attack_fill", vmath.vector4(0.769, 0, 0.078, 1))
 go.property("color_attack_ink", vmath.vector4(1, 1, 1, 1))
 go.property("color_player_fill", vmath.vector4(1, 1, 1, 1))
 go.property("color_player_ink", vmath.vector4(0, 0, 0, 1))
 -- Подсветки (GDD §5.4, §12): шаг — зелёная, прыжок — фиолетовая, атака — красная;
 -- пунктир выстрела белый; зрение врагов — оранжевый оверлей, красный — клетка игрока под наблюдением.
-go.property("color_outline_step", vmath.vector4(16 / 255, 185 / 255, 129 / 255, 1))
-go.property("color_outline_jump", vmath.vector4(158 / 255, 109 / 255, 1, 1))
-go.property("color_outline_attack", vmath.vector4(1, 31 / 255, 31 / 255, 1))
+go.property("color_outline_step", vmath.vector4(0.063, 0.725, 0.506, 1))
+go.property("color_outline_jump", vmath.vector4(0.62, 0.427, 1, 1))
+go.property("color_outline_attack", vmath.vector4(1, 0.122, 0.122, 1))
 go.property("color_dot", vmath.vector4(1, 1, 1, 1))
-go.property("color_vision", vmath.vector4(1, 115 / 255, 27 / 255, 1))
-go.property("color_spotted", vmath.vector4(1, 31 / 255, 31 / 255, 1))
+go.property("color_vision", vmath.vector4(1, 0.451, 0.106, 1))
+go.property("color_spotted", vmath.vector4(1, 0.122, 0.122, 1))
+-- Мигание экрана при уроне по игроку (GDD §16). gui-скрипты не поддерживают go.property,
+-- поэтому параметры живут здесь и приходят в HUD сообщением "flash".
+go.property("color_flash", vmath.vector4(1, 0.05, 0.05, 1))
+go.property("flash_alpha", 0.45)
+go.property("flash_ms", 150)
 
 -- Символы типов карт (текст — не число, остаётся в коде).
 local SYMBOL = {
@@ -248,6 +254,15 @@ local function lunge_offset(x0, y0, x1, y1, fraction)
 	local dx = layout.cell_x(x1) - layout.cell_x(x0)
 	local dy = layout.world_center(y1) - layout.world_center(y0)
 	return vmath.vector3(dx * fraction, dy * fraction, 0)
+end
+
+-- Мигание экрана при уроне по игроку: параметры — свойства world (gui-скрипты без property).
+local function hud_flash(self)
+	msg.post("#hud", "flash", {
+		color = self.color_flash,
+		alpha = self.flash_alpha,
+		duration = self.flash_ms / 1000,
+	})
 end
 
 -- Нижний ряд арены (ряд игрока): ряд типа boss с остатком периода (PERIOD - ARENA_ROWS).
@@ -521,14 +536,14 @@ local function steps_step(self, from_x, from_y, events)
 			local dx = (i - 1) * self.popup_spread - self.popup_spread / 2
 			table.insert(steps, function(next)
 				spawn_popup(self, from_x, from_y, "-" .. e.damage, "damage", dx)
-				msg.post("#hud", "flash")
+				hud_flash(self)
 				next()
 			end)
 		end
 	end
 	if died then
 		table.insert(steps, function(next)
-			msg.post("#hud", "flash")
+			hud_flash(self)
 			next()
 		end)
 		table.insert(steps, card_anim(self, self.player_go, "fall", {
@@ -580,7 +595,7 @@ local function steps_melee(self, from_x, from_y, tx, ty, events)
 		-- Отскок завершён: цифры урона, мигание экрана (урон по игроку), поверженный враг падает.
 		spawn_popup(self, tx, ty, "-" .. poke.dealt_to_enemy, "damage", 0)
 		spawn_popup(self, from_x, from_y, "-" .. poke.dealt_to_player, "damage", self.popup_spread)
-		msg.post("#hud", "flash")
+		hud_flash(self)
 		if dead ~= nil then
 			if enemy_card ~= nil then
 				fall_message(self, enemy_card, ty)
@@ -676,7 +691,7 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 		}))
 		table.insert(steps, function(next)
 			spawn_popup(self, mid_x, from_y, "-" .. battack.damage, "damage", 0)
-			msg.post("#hud", "flash")
+			hud_flash(self)
 			if outcome == "defeat" then
 				table.insert(steps, card_anim(self, self.player_go, "fall", {
 					offset = vmath.vector3(0, -layout.row_height(from_y) * self.fall_drop, 0),

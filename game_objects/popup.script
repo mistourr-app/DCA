@@ -5,9 +5,9 @@
 
 go.property("float_ms", 600)
 go.property("float_rise", 60)
-go.property("color_damage", vmath.vector4(1, 31 / 255, 31 / 255, 1))
-go.property("color_heal", vmath.vector4(16 / 255, 185 / 255, 129 / 255, 1))
-go.property("color_gold", vmath.vector4(1, 231 / 255, 97 / 255, 1))
+go.property("color_damage", vmath.vector4(1, 0.122, 0.122, 1))
+go.property("color_heal", vmath.vector4(0.063, 0.725, 0.506, 1))
+go.property("color_gold", vmath.vector4(1, 0.906, 0.38, 1))
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("show") then

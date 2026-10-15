@@ -1,12 +1,9 @@
 -- HUD: вывод текста, мигание экрана при уроне по игроку (GDD §16) и оверлей смерти.
 -- Ввод обрабатывает collections/world.script (тап по координатам), поэтому здесь нет
--- обработки нажатий.
+-- обработки нажатий. go.property в gui-скриптах не поддерживается: параметры вспышки
+-- приходят сообщением "flash" из world.script (его свойства color_flash/flash_alpha/flash_ms).
 -- Сигнатура gui.animate: (node, property, to, easing, duration, delay, complete_function,
 -- playback) — отличается от go.animate: нет playback на 3-м месте.
-
-go.property("flash_ms", 150)
-go.property("flash_alpha", 0.45)
-go.property("flash_color", vmath.vector4(1, 0.05, 0.05, 1))
 
 local function set_overlay(visible)
 	gui.set_enabled(gui.get_node("overlay"), visible)
@@ -19,7 +16,8 @@ function init(self)
 end
 
 -- "update": message.top, message.bottom — строки; message.overlay — показывать ли экран смерти.
--- "flash": красная вспышка на весь экран, гаснет за flash_ms.
+-- "flash": message.color (vector4), message.alpha, message.duration (сек) —
+-- красная вспышка на весь экран, гаснет за duration.
 function on_message(self, message_id, message, sender)
 	if message_id == hash("update") then
 		gui.set_text(gui.get_node("top"), message.top)
@@ -27,10 +25,10 @@ function on_message(self, message_id, message, sender)
 		set_overlay(message.overlay)
 	elseif message_id == hash("flash") then
 		local node = gui.get_node("flash")
+		local color = message.color
 		gui.cancel_animations(node, "color")
-		gui.set_color(node, vmath.vector4(self.flash_color.x, self.flash_color.y,
-			self.flash_color.z, self.flash_alpha))
-		gui.animate(node, "color", vmath.vector4(self.flash_color.x, self.flash_color.y,
-			self.flash_color.z, 0), gui.EASING_OUTQUAD, self.flash_ms / 1000)
+		gui.set_color(node, vmath.vector4(color.x, color.y, color.z, message.alpha))
+		gui.animate(node, "color", vmath.vector4(color.x, color.y, color.z, 0),
+			gui.EASING_OUTQUAD, message.duration)
 	end
 end
