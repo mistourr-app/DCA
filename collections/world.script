@@ -598,7 +598,7 @@ function init(self)
 		player = self.player,
 		get_row = function(y)
 			return get_row(self, y)
-		},
+		end,
 	}
 	if not found then
 		save(self)
