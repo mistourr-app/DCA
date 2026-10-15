@@ -7,32 +7,41 @@ local CAMP_CELLS = { "CAMP", "WALL", "EMPTY", "CAMP", "EMPTY" }
 local function valid_raw()
 	return {
 		version = save_schema.SCHEMA_VERSION,
-		seed = 42,
-		respawn_count = 3,
 		gold = 120,
 		upgrades = { hp = 2, weaponDamage = 1, maxAmmo = 0 },
 		return_point = { kind = "checkpoint", row = 10, x = 2 },
 	}
 end
 
-M["schema is version 2"] = function(t)
-	t.equal(save_schema.SCHEMA_VERSION, 2, "версия 2")
+M["schema is version 3"] = function(t)
+	t.equal(save_schema.SCHEMA_VERSION, 3, "версия 3")
 end
 
 M["valid save passes and keeps values"] = function(t)
 	local out = save_schema.validate(valid_raw())
 	t.equal(out.gold, 120, "золото")
 	t.equal(out.upgrades.hp, 2, "уровень hp")
-	t.equal(out.seed, 42, "seed")
-	t.equal(out.respawn_count, 3, "счётчик возрождений")
+	t.equal(out.return_point.row, 10, "точка возврата")
 end
 
-M["version 1 saves are rejected entirely"] = function(t)
+M["version 1 and 2 saves are rejected entirely"] = function(t)
 	local raw = valid_raw()
 	raw.version = 1
 	local out, err = save_schema.validate(raw)
-	t.equal(out, nil, "старая версия отвергнута")
+	t.equal(out, nil, "версия 1 отвергнута")
 	t.true_(err ~= nil, "есть причина")
+	raw.version = 2
+	out = save_schema.validate(raw)
+	t.equal(out, nil, "версия 2 отвергнута: при загрузке новый мир")
+end
+
+M["seed and respawn_count are not saved anymore"] = function(t)
+	local raw = valid_raw()
+	raw.seed = 42
+	raw.respawn_count = 3
+	local out = save_schema.validate(raw)
+	t.equal(out.seed, nil, "seed отброшен: при старте всегда новый мир")
+	t.equal(out.respawn_count, nil, "счётчик возрождений отброшен")
 end
 
 M["non-table input is rejected"] = function(t)
@@ -51,12 +60,10 @@ end
 M["negative and non-numeric values fall back to defaults"] = function(t)
 	local raw = valid_raw()
 	raw.gold = -50
-	raw.respawn_count = -1
 	raw.upgrades.hp = -1
 	raw.upgrades.weaponDamage = "lots"
 	local out = save_schema.validate(raw)
 	t.equal(out.gold, 0, "золото не отрицательное")
-	t.equal(out.respawn_count, 0, "счётчик не отрицательный")
 	t.equal(out.upgrades.hp, 0, "уровень не отрицательный")
 	t.equal(out.upgrades.weaponDamage, 0, "не число — ноль")
 end
@@ -77,6 +84,14 @@ M["validate does not modify the input"] = function(t)
 	local raw = valid_raw()
 	save_schema.validate(raw)
 	t.equal(raw.gold, 120, "исходное золото не тронуто")
+end
+
+M["default is a fresh run at start"] = function(t)
+	local d = save_schema.default()
+	t.equal(d.version, save_schema.SCHEMA_VERSION, "версия по умолчанию")
+	t.equal(d.gold, 0, "золото ноль")
+	t.equal(d.return_point.kind, "start", "старт")
+	t.equal(d.return_point.row, 0, "ряд старта")
 end
 
 M["invalid return point falls back to start"] = function(t)

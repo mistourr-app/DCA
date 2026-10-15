@@ -11,9 +11,17 @@
 --   prev_boss_x               колонка босса до его последнего хода (для запрета возврата)
 --   fired                     выстрел в этом ходу уже был
 --   player_row, boss_row      клетки рядов арены { [x] = { type = ... } }
+--   gen                       генератор core/rng для пересоздания клетки при уходе
 --
 -- Ход игрока: выстрел (не завершает ход, один за ход) или перемещение/атака клеткой
--- (завершают ход и передают его боссу).
+-- (завершают ход и передают его боссу). Перемещение горизонтальное: соседняя колонка — шаг
+-- бесплатно, дальше — прыжок ценой max(0, |dx| - 1) HP (то же правило, что в мире, GDD §5.1).
+--
+-- Механизм клеток един для обоих рядов (GDD §12.4): эффект срабатывает при вступании
+-- (лечение, атака игрока по боссу, атака босса по игроку), клетка становится пустой.
+-- При уходе актёра с любой клетки своего ряда генератор кладёт на её место новую:
+-- ряд игрока — атака/лечение/пусто по текущей HP-доле, ряд босса — атака/пусто по базовому
+-- шансу. Клетка под актёром не меняется; босс бьёт клеткой атаки в любой колонке.
 
 local balance = require("core.data.balance")
 local grid = require("core.grid")
@@ -75,8 +83,28 @@ function M.generate_rows(g, ch)
 	return player_row, boss_row
 end
 
--- Новое состояние арены.
-function M.new(player_x, player_hp, player_max, boss_number, player_row, boss_row)
+-- Новая клетка на месте той, с которой ушёл игрок: шансы по текущей HP-доле (GDD §12.4).
+function M.reroll_player_cell(a)
+	local ch = M.player_row_chances(a.player_hp / a.player_max)
+	local roll = a.gen:float()
+	if roll < ch.ATTACK_CELL then
+		return { type = "ATTACK_CELL", damage = attack_damage(a.gen) }
+	elseif roll < ch.ATTACK_CELL + ch.HEAL then
+		return { type = "HEAL" }
+	end
+	return { type = "EMPTY" }
+end
+
+-- Новая клетка на месте той, с которой ушёл босс: базовый шанс атаки, лечения нет.
+function M.reroll_boss_cell(a)
+	if a.gen:float() < balance.arena.chances.ATTACK_CELL.base then
+		return { type = "ATTACK_CELL", damage = attack_damage(a.gen) }
+	end
+	return { type = "EMPTY" }
+end
+
+-- Новое состояние арены. gen — генератор core/rng для пересоздания клеток по ходу боя.
+function M.new(player_x, player_hp, player_max, boss_number, player_row, boss_row, gen)
 	local boss_max = M.boss_max_hp(player_max, boss_number)
 	return {
 		player_x = player_x,
@@ -90,28 +118,37 @@ function M.new(player_x, player_hp, player_max, boss_number, player_row, boss_ro
 		fired = false,
 		player_row = player_row,
 		boss_row = boss_row,
+		gen = gen,
 	}
 end
 
--- Ход босса: перемещение и (если на клетке атаки) удар по игроку. Возврат ход игроку.
--- Урон босса = его текущий HP (GDD §5.3 для атаки, согласованно с врагами).
+-- Ход босса: перемещение и (если стал на клетку атаки) удар по игроку. Возврат ход игроку.
+-- Босс бьёт клеткой атаки в любой колонке, механизм тот же, что у игрока (GDD §12.2, §12.4).
+-- Уходя с клетки, босс оставляет на её месте новую.
 function M.boss_turn(a)
 	local events = {}
 	local new_x = boss_ai.choose(a)
+	local from = a.boss_x
 	a.prev_boss_x = a.boss_x
 	a.boss_x = new_x
 	local cell = a.boss_row[new_x] or { type = "EMPTY" }
-	if cell.type == "ATTACK_CELL" and new_x == a.player_x then
+	if cell.type == "ATTACK_CELL" then
 		a.player_hp = math.max(0, a.player_hp - cell.damage)
+		a.boss_row[new_x] = { type = "EMPTY" }
 		table.insert(events, { type = "boss_attack", damage = cell.damage, hp = a.player_hp })
 	end
 	table.insert(events, { type = "boss_move", x = new_x })
 	a.turn = "player"
 	a.fired = false
+	if from ~= new_x then
+		a.boss_row[from] = M.reroll_boss_cell(a)
+	end
 	return events
 end
 
 -- Выстрел из арбалета по боссу: не завершает ход, один за ход. Урон — оружия.
+-- Лимит хода — a.fired (сбрасывается ходом босса); флаг «уже стрелял на ряду» (fired_this_row)
+-- механика мира, в арене не участвует. Расход заряда и запуск перезарядки — core/equipment.
 -- range — дальность оружия в клетках (по колонкам, GDD §5.1).
 function M.shoot(a, weapon, damage, range)
 	if a.turn ~= "player" then
@@ -123,28 +160,36 @@ function M.shoot(a, weapon, damage, range)
 	if math.abs(a.boss_x - a.player_x) > range then
 		return false, "Boss out of range"
 	end
-	local ok, reason = equipment.fire(weapon)
+	local ok, reason = equipment.can_use(weapon)
 	if not ok then
 		return false, reason
 	end
+	equipment.use(weapon)
 	a.fired = true
 	a.boss_hp = math.max(0, a.boss_hp - damage)
 	return true, { { type = "shot", damage = damage, boss_hp = a.boss_hp } }
 end
 
--- Перемещение игрока по X на ряде арены. Передаёт ход боссу.
+-- Перемещение игрока по X на ряде арены: соседняя колонка — шаг, дальше — прыжок за HP.
+-- Передаёт ход боссу. Прыжок допустим, только если HP − стоимость ≥ 1 (GDD §5.1, §12.2).
 -- Клетка на ряду игрока: лечение применяется, клетка атаки наносит урон боссу (передача хода).
 function M.player_move(a, x)
 	if a.turn ~= "player" then
 		return false, "Not your turn"
 	end
-	if not grid.in_columns(x) or math.abs(x - a.player_x) > 1 then
-		return false, "Move only to an adjacent column"
+	if not grid.in_columns(x) or x == a.player_x then
+		return false, "Move to another column on the arena"
 	end
+	local cost = math.max(0, math.abs(x - a.player_x) - 1)
+	if a.player_hp - cost < 1 then
+		return false, "Not enough HP to jump"
+	end
+	local from = a.player_x
+	a.player_hp = a.player_hp - cost
 	a.player_x = x
 	-- Перемещение или атака клеткой передают ход боссу (GDD §12.2).
 	a.turn = "boss"
-	local events = { { type = "player_move", x = x } }
+	local events = { { type = "player_move", x = x, cost = cost } }
 	local cell = a.player_row[x] or { type = "EMPTY" }
 	if cell.type == "HEAL" then
 		a.player_hp = math.min(a.player_max, a.player_hp + balance.cells.HEAL.amount)
@@ -155,6 +200,8 @@ function M.player_move(a, x)
 		a.boss_hp = math.max(0, a.boss_hp - cell.damage)
 		table.insert(events, { type = "player_attack", damage = cell.damage, boss_hp = a.boss_hp })
 	end
+	-- Уходя с клетки, игрок оставляет на её месте новую (GDD §12.4).
+	a.player_row[from] = M.reroll_player_cell(a)
 	return true, events
 end
 

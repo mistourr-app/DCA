@@ -112,23 +112,33 @@ function M.dash_points(ax, ay, bx, by, step)
 	return out
 end
 
--- Арена: ходы по X на ряду игрока. kind = "attack" для клетки атаки, иначе "step".
+-- Арена: ходы по X на своем ряду. Соседняя колонка — step, дальше — jump (стоит HP),
+-- клетка атаки — attack. Недоступные прыжки (HP − стоимость < 1) не подсвечиваются.
 function M.arena_moves(a)
 	local out = {}
 	if a.turn ~= "player" then
 		return out
 	end
-	for _, dx in ipairs({ -1, 1 }) do
-		local x = a.player_x + dx
-		if x >= 0 and x < COLUMNS then
-			local c = a.player_row[x] or { type = "EMPTY" }
-			table.insert(out, { x = x, kind = c.type == "ATTACK_CELL" and "attack" or "step" })
+	for x = 0, COLUMNS - 1 do
+		if x ~= a.player_x then
+			local cost = math.max(0, math.abs(x - a.player_x) - 1)
+			if a.player_hp - cost >= 1 then
+				local c = a.player_row[x] or { type = "EMPTY" }
+				local kind = "jump"
+				if c.type == "ATTACK_CELL" then
+					kind = "attack"
+				elseif cost == 0 then
+					kind = "step"
+				end
+				table.insert(out, { x = x, kind = kind, cost = cost })
+			end
 		end
 	end
 	return out
 end
 
 -- Арена: колонка босса, если выстрел по нему возможен сейчас, иначе nil.
+-- Лимит арены — один выстрел за ход (a.fired); флаг «уже стрелял на ряду» — механика мира.
 function M.arena_shot(a, weapon, range)
 	if a.turn ~= "player" or a.fired then
 		return nil
@@ -136,7 +146,7 @@ function M.arena_shot(a, weapon, range)
 	if math.abs(a.boss_x - a.player_x) > range then
 		return nil
 	end
-	if not equipment.can_fire(weapon) then
+	if not equipment.can_use(weapon) then
 		return nil
 	end
 	return a.boss_x

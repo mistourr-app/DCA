@@ -269,8 +269,6 @@ end
 local function save(self)
 	saves.write({
 		version = save_schema.SCHEMA_VERSION,
-		seed = self.seed,
-		respawn_count = self.world.respawn_count,
 		gold = self.player.gold,
 		upgrades = self.upgrades,
 		return_point = return_point_for_save(self),
@@ -353,7 +351,10 @@ local function enter_arena(self)
 	local g = rng.new(row_seed.row_seed(self.seed, self.world.respawn_count, pos.y))
 	local frac = self.player.hp / self.player.max_hp
 	local pr, br = arena.generate_rows(g, arena.player_row_chances(frac))
-	self.arena = arena.new(pos.x, self.player.hp, self.player.max_hp, boss_number, pr, br)
+	self.arena = arena.new(pos.x, self.player.hp, self.player.max_hp, boss_number, pr, br, g)
+	-- Флаг «уже стрелял на ряду» — механика мира; в арене свой лимит (a.fired).
+	-- Сбрасываем при входе, чтобы выстрел был доступен с первого хода боя (GDD §12.2).
+	equipment.new_row(self.player.weapon)
 	world.transition(self.world, MODES.BOSS)
 	print("arena " .. boss_number .. " started at row " .. pos.y)
 end
@@ -389,6 +390,8 @@ local function arena_move(self, x)
 			table.insert(events, e)
 		end
 	end
+	-- Завершённый ход игрока в арене, как в мире: тикает таймер перезарядки (GDD §7).
+	equipment.tick(self.player.weapon)
 	self.player.hp = a.player_hp
 	self.world.pos.x = a.player_x
 	arena_outcome(self)
@@ -453,12 +456,14 @@ end
 function init(self)
 	msg.post(".", "acquire_input_focus")
 	local data, found = saves.load()
-	self.seed = found and data.seed or (os.time() % 2147483647)
+	-- Seed всегда новый: при каждом запуске генерируется новый мир (GDD §18).
+	-- Из сохранения живут только золото, прокачка и точка возврата.
+	self.seed = math.floor((os.time() + os.clock()) * 1000) % 2147483647
 	self.upgrades = data.upgrades
 	self.camp_state = camp.new_state()
 	self.rows = {}
 	self.ids = {}
-	self.world = world.new(self.seed, data.respawn_count)
+	self.world = world.new(self.seed, 0)
 	if found then
 		local rp = data.return_point
 		self.world.return_point = { kind = rp.kind, row = rp.row, x = rp.x }
@@ -523,7 +528,7 @@ function on_input(self, action_id, action)
 			return true
 		end
 		local a = self.arena
-		if k == 0 and math.abs(x - a.player_x) == 1 then
+		if k == 0 and x ~= a.player_x then
 			arena_move(self, x)
 		elseif k == 1 and x == a.boss_x then
 			arena_shoot(self)

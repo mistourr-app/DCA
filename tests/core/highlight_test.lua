@@ -144,8 +144,8 @@ M["dash points are evenly spaced between the endpoints"] = function(t)
 	t.equal(pts[4].x, 80, "последняя точка")
 end
 
-M["arena moves: adjacent columns only, attack cell marked"] = function(t)
-	local a = { turn = "player", player_x = 2, player_row = {}, boss_x = 2, fired = false }
+M["arena moves: adjacent is step, far is jump, attack cell is attack"] = function(t)
+	local a = { turn = "player", player_x = 2, player_hp = 20, player_row = {}, boss_x = 2, fired = false }
 	for x = 0, COLUMNS - 1 do
 		a.player_row[x] = { type = "EMPTY" }
 	end
@@ -154,9 +154,24 @@ M["arena moves: adjacent columns only, attack cell marked"] = function(t)
 	for _, m in ipairs(highlight.arena_moves(a)) do
 		byx[m.x] = m.kind
 	end
-	t.equal(byx[1], "step", "влево — шаг")
-	t.equal(byx[3], "attack", "вправо — клетка атаки")
-	t.equal(byx[4], nil, "дальше соседней не подсвечивается")
+	t.equal(byx[1], "step", "сосед слева — шаг")
+	t.equal(byx[3], "attack", "клетка атаки — атака")
+	t.equal(byx[0], "jump", "через колонку — прыжок")
+	t.equal(byx[4], "jump", "правый край — прыжок")
+	t.equal(byx[2], nil, "своя клетка не подсвечивается")
+end
+
+M["arena: unaffordable jumps are not highlighted"] = function(t)
+	local a = { turn = "player", player_x = 0, player_hp = 1, player_row = {}, boss_x = 0, fired = false }
+	for x = 0, COLUMNS - 1 do
+		a.player_row[x] = { type = "EMPTY" }
+	end
+	local byx = {}
+	for _, m in ipairs(highlight.arena_moves(a)) do
+		byx[m.x] = m.kind
+	end
+	t.equal(byx[1], "step", "соседняя доступна")
+	t.equal(byx[2], nil, "прыжок за 1 HP из HP 1 не подсвечивается")
 end
 
 M["arena shot highlight only when the boss is in range and the turn is the player's"] = function(t)
@@ -167,6 +182,10 @@ M["arena shot highlight only when the boss is in range and the turn is the playe
 	a.boss_x = 2
 	a.turn = "boss"
 	t.equal(highlight.arena_shot(a, equipment.new(3, 5), 3), nil, "ход босса")
+	a.turn = "player"
+	local row_fired = equipment.new(3, 5)
+	equipment.fire(row_fired)
+	t.equal(highlight.arena_shot(a, row_fired, 3), 2, "флаг ряда не глушит выстрел в арене")
 end
 
 return M
