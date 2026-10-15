@@ -424,26 +424,6 @@ local function card_anim(self, id, name, payload)
 	end
 end
 
--- Шаг: несколько подшагов параллельно, next — когда все закончились.
-local function parallel(steps)
-	return function(next)
-		local left = #steps
-		if left == 0 then
-			next()
-			return
-		end
-		local function once()
-			left = left - 1
-			if left == 0 then
-				next()
-			end
-		end
-		for _, s in ipairs(steps) do
-			s(once)
-		end
-	end
-end
-
 -- Таймлайн перемещения: карта игрока приподнимается, летит в новую клетку, контейнер рядов
 -- скроллится одновременно с ней; старт и финиш совпадают (anim.move_ms).
 local function play_move(self, from_x, from_y, to_x, to_y, done)
@@ -508,21 +488,19 @@ local function steps_step(self, from_x, from_y, events)
 		end
 	end
 	if #behinds > 0 then
-		local inner = {}
-		for _, e in ipairs(behinds) do
-			table.insert(inner, card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
+		-- Несколько врагов бьют «в спину» последовательно: выпад, цифра, вспышка — на каждого.
+		for i, e in ipairs(behinds) do
+			table.insert(steps, card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
 				offset = lunge_offset(e.enemy_x, from_y, from_x, from_y, 0.6),
 				duration = design.anim.poke_ms / 1000,
 			}))
+			local dx = (i - 1) * 42 - 20
+			table.insert(steps, function(next)
+				spawn_popup(self, from_x, from_y, "-" .. e.damage, POPUP.damage, dx)
+				msg.post("#hud", "flash")
+				next()
+			end)
 		end
-		table.insert(steps, parallel(inner))
-		table.insert(steps, function(next)
-			for i, e in ipairs(behinds) do
-				spawn_popup(self, from_x, from_y, "-" .. e.damage, POPUP.damage, (i - 1) * 42 - 20)
-			end
-			msg.post("#hud", "flash")
-			next()
-		end)
 	end
 	if died then
 		table.insert(steps, function(next)
