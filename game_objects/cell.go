@@ -5,6 +5,11 @@ components {
 components {
   id: "label"
   component: "/game_objects/cell_label.label"
+  position {
+    x: 0.0
+    y: 0.0
+    z: 0.2
+  }
 }
 components {
   id: "cell"

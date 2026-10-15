@@ -1,6 +1,7 @@
 local highlight = require("core.highlight")
 local equipment = require("core.equipment")
 local balance = require("core.data.balance")
+local design = require("core.data.design")
 
 local M = {}
 
@@ -89,35 +90,51 @@ M["every reachable enemy gets its own shot line"] = function(t)
 	t.equal(#highlight.shot_targets({ x = 2, y = 5 }, row, equipment.new(3, 5), 3), 2, "две цели")
 end
 
-M["threat: enemy sees cells in its vision range, walls make idle"] = function(t)
+M["vision: enemy sees cells in range; wall is not marked and blocks beyond it"] = function(t)
 	local row = empty_row()
 	row[0] = { type = "ENEMY", enemy = "TYPE_1" }
 	row[2] = { type = "WALL" }
-	local th = highlight.threat(row, 3)
-	t.equal(th[1].alert, 1, "соседняя клетка видна")
-	t.equal(th[1].idle, 0, "видна — не idle")
-	t.equal(th[3].alert, 0, "за стеной не видна")
-	t.equal(th[3].idle, 1, "за стеной — idle (в зоне обзора)")
-	t.equal(th[4].idle, 1, "дальний край обзора (4 клетки) за стеной — idle")
+	local v = highlight.vision(row, 3)
+	t.equal(v[1], 1, "соседняя клетка видна")
+	t.equal(v[2], 0, "стена не подсвечивается")
+	t.equal(v[3], 0, "за стеной не видно")
+	t.equal(v[4], 0, "и дальний край за стеной не видно")
+	t.equal(v[0], 0, "клетка самого врага не помечается")
 end
 
-M["threat: cells beyond vision range are not threatened"] = function(t)
+M["vision: cells beyond vision range are not marked"] = function(t)
 	local row = empty_row()
 	row[0] = { type = "ENEMY", enemy = "TYPE_3" }
-	local th = highlight.threat(row, 3)
-	t.equal(th[1].alert, 1, "WARDEN видит соседнюю колонку")
-	t.equal(th[2].alert + th[2].idle, 0, "WARDEN не видит дальше соседней")
+	local v = highlight.vision(row, 3)
+	t.equal(v[1], 1, "WARDEN видит соседнюю колонку")
+	t.equal(v[2], 0, "WARDEN не видит дальше соседней")
 end
 
-M["threat style alpha is 25 percent per enemy, capped at 100"] = function(t)
-	local kind, a = highlight.threat_style({ alert = 2, idle = 0 })
-	t.equal(kind, "alert", "красный")
-	t.equal(a, 0.5, "два врага — 50%")
-	local _, cap = highlight.threat_style({ alert = 9, idle = 0 })
-	t.equal(cap, 1, "не выше 100%")
-	local k2 = highlight.threat_style({ alert = 0, idle = 1 })
-	t.equal(k2, "idle", "оранжевый")
-	t.equal(select(1, highlight.threat_style({ alert = 0, idle = 0 })), nil, "угрозы нет")
+M["vision: range from csv marks cells up to the limit"] = function(t)
+	local row = empty_row()
+	row[0] = { type = "ENEMY", enemy = "TYPE_2" }
+	local v = highlight.vision(row, 3)
+	t.equal(v[1] + v[2], 2, "SPEARMAN видит две колонки")
+	t.equal(v[3] + v[4], 0, "дальше дальности нет")
+end
+
+M["vision alpha stacks per enemy from design and caps at 100"] = function(t)
+	local a = design.screen.threatAlpha
+	t.equal(highlight.vision_alpha(0), nil, "угрозы нет")
+	t.equal(highlight.vision_alpha(1), a, "один враг")
+	t.equal(highlight.vision_alpha(2), a * 2, "два врага — 50%")
+	t.equal(highlight.vision_alpha(9), 1, "не выше 100%")
+end
+
+M["spotted: true when an enemy sees the player cell"] = function(t)
+	local row = empty_row()
+	row[0] = { type = "ENEMY", enemy = "TYPE_2" }
+	local v = highlight.vision(row, 3)
+	t.true_(highlight.spotted(v, 2), "игрок в поле зрения")
+	t.equal(highlight.spotted(v, 4), false, "вне поля зрения")
+	row[1] = { type = "WALL" }
+	local blocked = highlight.vision(row, 3)
+	t.equal(highlight.spotted(blocked, 2), false, "стена перекрывает игрока")
 end
 
 M["dash points are evenly spaced between the endpoints"] = function(t)

@@ -24,6 +24,20 @@ local row_seed = require("core.row_seed")
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
 
+-- Слои отрисовки (position.z). Default-камера Defold рендерит только z в [-1..1], вне диапазона
+-- объект молча не рисуется; больше z = ближе к камере; равный z = порядок не определён.
+-- label в cell.go поднят на +0.2 внутри GO: «содержимое» клетки остаётся поверх слоя угроз.
+-- Клетки < слой угроз < персонажи < красный «вас видят» (под своей надписью) < обводки < пунктир.
+local Z_CELL = 0
+local Z_THREAT = 0.1
+local Z_ACTOR = 0.3
+local Z_SPOTTED = 0.4
+local Z_OUTLINE = 0.6
+local Z_DASH = 0.7
+
+-- Зазор между клетками: спрайты клеток, оверлеи и обводки входят в него с отступом.
+local GAP = 8
+
 -- Цвета из GDD §12. Фон клетки (fill) и цвет подписи (ink) задаются отдельно.
 local function rgb(r, g, b)
 	return vmath.vector4(r / 255, g / 255, b / 255, 1)
@@ -39,17 +53,16 @@ local SYMBOL = {
 }
 local PLAYER = { text = "@", fill = rgb(255, 255, 255), ink = rgb(0, 0, 0) }
 
--- Подсветки (GDD §12): шаг — зелёная, прыжок — фиолетовая, атака — красная, пунктир выстрела — красный.
+-- Подсветки (GDD §5.4, §12): шаг — зелёная, прыжок — фиолетовая, атака — красная, пунктир выстрела — белый.
 local OUTLINE = {
 	step = rgb(16, 185, 129),
 	jump = rgb(158, 109, 255),
 	attack = rgb(255, 31, 31),
 }
-local DOT_COLOR = rgb(255, 31, 31)
-local THREAT_COLOR = {
-	alert = rgb(255, 31, 31),
-	idle = rgb(255, 115, 27),
-}
+local DOT_COLOR = rgb(255, 255, 255)
+-- Зрение врагов: оранжевый оверлей на видимые клетки; красный — клетка игрока, когда его видят.
+local VISION_COLOR = rgb(255, 115, 27)
+local SPOTTED_COLOR = rgb(255, 31, 31)
 local function has_event(events, type_)
 	for _, e in ipairs(events) do
 		if e.type == type_ then
@@ -80,20 +93,20 @@ local function clear_cells(self)
 end
 
 -- Клетка с центром (cx, cy) и высотой h. В бою высота вдвое больше обычной (арена на весь экран).
-local function spawn(self, cx, cy, h, text, color, ink)
-	local pos = vmath.vector3(cx, cy, 0)
+local function spawn(self, cx, cy, h, text, color, ink, z)
+	local pos = vmath.vector3(cx, cy, z or Z_CELL)
 	local id = factory.create("#cell_factory", pos)
 	if id == nil then
 		print("cell spawn failed: label buffer full (raise [label] max_count in game.project)")
 		return
 	end
-	msg.post(id, "set", { text = text, color = color, text_color = ink, width = layout.CELL_W - 8, height = h - 8 })
+	msg.post(id, "set", { text = text, color = color, text_color = ink, width = layout.CELL_W - GAP, height = h - GAP })
 	table.insert(self.ids, id)
 end
 
--- Прямоугольник без надписи (обводка или точка пунктира).
-local function spawn_bar(self, cx, cy, w, h, color)
-	local id = factory.create("#bar_factory", vmath.vector3(cx, cy, 0))
+-- Прямоугольник без надписи (обводка, точка пунктира, оверлей угрозы).
+local function spawn_bar(self, cx, cy, w, h, color, z)
+	local id = factory.create("#bar_factory", vmath.vector3(cx, cy, z or Z_CELL))
 	if id == nil then
 		print("bar spawn failed: sprite buffer full (raise [sprite] max_count in game.project)")
 		return
@@ -104,31 +117,27 @@ end
 
 -- Обводка клетки: четыре полоски в зазоре между клетками (зазор = 8 px, полоски по 4 px).
 local BORDER = design.screen.borderWidth
-local GAP = 8
 local function draw_outline(self, cx, cy, w, h, color)
 	local ox = (w - GAP) / 2 + BORDER / 2
 	local oy = (h - GAP) / 2 + BORDER / 2
-	spawn_bar(self, cx, cy + oy, w, BORDER, color)
-	spawn_bar(self, cx, cy - oy, w, BORDER, color)
-	spawn_bar(self, cx - ox, cy, BORDER, h, color)
-	spawn_bar(self, cx + ox, cy, BORDER, h, color)
+	spawn_bar(self, cx, cy + oy, w, BORDER, color, Z_OUTLINE)
+	spawn_bar(self, cx, cy - oy, w, BORDER, color, Z_OUTLINE)
+	spawn_bar(self, cx - ox, cy, BORDER, h, color, Z_OUTLINE)
+	spawn_bar(self, cx + ox, cy, BORDER, h, color, Z_OUTLINE)
 end
 
--- Тонкая пунктирная линия от точки (ax, ay) до (bx, by).
+-- Тонкая пунктирная линия от точки (ax, ay) до (bx, by), верхний слой.
 local DASH = design.screen.dashSize
 local function draw_dashed(self, ax, ay, bx, by)
 	for _, p in ipairs(highlight.dash_points(ax, ay, bx, by, highlight.DASH_STEP)) do
-		spawn_bar(self, p.x, p.y, DASH, DASH, DOT_COLOR)
+		spawn_bar(self, p.x, p.y, DASH, DASH, DOT_COLOR, Z_DASH)
 	end
 end
 
--- Наложение угрозы на цвет клетки (GDD §5.4): alpha-смешение с красным или оранжевым.
-local function blend(base, color, a)
-	return vmath.vector4(
-		base.x * (1 - a) + color.x * a,
-		base.y * (1 - a) + color.y * a,
-		base.z * (1 - a) + color.z * a,
-		1)
+-- Оверлей угрозы поверх клетки: цвет с заданной непрозрачностью, в своём слое z.
+local function draw_threat(self, cx, cy, h, color, alpha, z)
+	spawn_bar(self, cx, cy, layout.CELL_W - GAP, h - GAP,
+		vmath.vector4(color.x, color.y, color.z, alpha), z)
 end
 
 -- Нижний ряд арены (ряд игрока): ряд типа boss с остатком периода (PERIOD - ARENA_ROWS).
@@ -177,24 +186,32 @@ local function refresh(self)
 		return
 	end
 	-- Обычный режим: видны ряд игрока и ряды над ним; остальные — туман войны (не рисуются).
+	-- Для каждого ряда: клетки (z=0), затем слой угроз (z=10) поверх клеток, под персонажами.
+	local px = self.world.pos.x
 	for _, k in ipairs(layout.visible_offsets()) do
 		local cells = get_row(self, pr + k)
 		local cy = layout.row_y(k)
-		local threat = highlight.threat(cells, pr + k)
+		local vision_row = highlight.vision(cells, pr + k)
 		for x = 0, layout.COLUMNS - 1 do
 			local c = cells[x] or { type = "EMPTY" }
 			local sym = SYMBOL[c.type] or SYMBOL.EMPTY
 			local text = sym.text
-			local fill = sym.fill
 			if c.type == "ENEMY" then
 				local t = registry.enemies.types[c.enemy]
 				text = t.label:sub(1, 1) .. tostring(c.hp or t.base_hp)
 			end
-			local kind, alpha = highlight.threat_style(threat[x])
-			if kind ~= nil then
-				fill = blend(fill, THREAT_COLOR[kind], alpha)
+			spawn(self, layout.cell_x(x), cy, layout.CELL_H, text, sym.fill, sym.ink)
+		end
+		for x = 0, layout.COLUMNS - 1 do
+			local alpha = highlight.vision_alpha(vision_row[x])
+			if alpha ~= nil then
+				if k == 0 and x == px and self.world.mode == MODES.WORLD then
+					-- Игрок в поле зрения: его клетка красная, поверх спрайта персонажа, под надписью.
+					draw_threat(self, layout.cell_x(x), cy, layout.CELL_H, SPOTTED_COLOR, alpha, Z_SPOTTED)
+				else
+					draw_threat(self, layout.cell_x(x), cy, layout.CELL_H, VISION_COLOR, alpha, Z_THREAT)
+				end
 			end
-			spawn(self, layout.cell_x(x), cy, layout.CELL_H, text, fill, sym.ink)
 		end
 	end
 	local py = layout.row_y(0)
@@ -208,7 +225,7 @@ local function refresh(self)
 			draw_dashed(self, layout.cell_x(self.world.pos.x), py, layout.cell_x(x), py)
 		end
 	end
-	spawn(self, layout.cell_x(self.world.pos.x), py, layout.CELL_H, PLAYER.text, PLAYER.fill, PLAYER.ink)
+	spawn(self, layout.cell_x(self.world.pos.x), py, layout.CELL_H, PLAYER.text, PLAYER.fill, PLAYER.ink, Z_ACTOR)
 end
 
 -- Текст HUD и кнопки внизу экрана.

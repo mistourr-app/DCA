@@ -4,8 +4,9 @@
 --   attack (красная) — ближний бой с врагом на следующем ряду.
 -- Пунктир выстрела: рисуется до каждой цели, в которую выстрел возможен (есть заряд,
 --   цель в дальности, линия не перекрыта стеной). Если выстрел невозможен — ничего.
--- Карты угроз: alert — колонка видна врагу (красный), idle — колонка в зоне обзора, но линия
---   перекрыта стеной (оранжевый). По 25% на каждого врага, сумма не выше 100%.
+-- Зрение врагов: оранжевым помечаются все клетки, которые видит хотя бы один враг своего ряда.
+--   Стена не подсвечивается и блокирует обзор за собой. Если игрока видит враг, его клетка
+--   красная. Непрозрачность 25% на каждого врага (design.screen.threatAlpha), сумма не выше 100%.
 
 local design = require("core.data.design")
 local grid = require("core.grid")
@@ -17,7 +18,7 @@ local registry = require("core.registry.init")
 local M = {}
 
 local COLUMNS = grid.COLUMNS
-local PER_ENEMY = 0.25
+local PER_ENEMY = design.screen.threatAlpha
 
 M.DASH_STEP = design.screen.dashStep
 
@@ -61,12 +62,13 @@ function M.shot_targets(pos, row, weapon, range)
 	return out
 end
 
--- Карта угроз ряда y: для каждой колонки { alert = n, idle = n } (n — число врагов ряда).
+-- Карта зрения ряда y: для каждой колонки число врагов, которые её видят.
 -- Враги ходят только по своему ряду, поэтому угрозы действуют на клетки того же ряда.
-function M.threat(row, y)
+-- Стена не помечается; клетки за стеной не помечаются (обзор блокируется).
+function M.vision(row, y)
 	local out = {}
 	for x = 0, COLUMNS - 1 do
-		out[x] = { alert = 0, idle = 0 }
+		out[x] = 0
 	end
 	local wall = wall_fn(row)
 	for ex = 0, COLUMNS - 1 do
@@ -74,13 +76,9 @@ function M.threat(row, y)
 		if c and c.type == "ENEMY" then
 			local vision = registry.enemies.types[c.enemy].vision
 			for x = 0, COLUMNS - 1 do
-				local dist = math.abs(x - ex)
-				if x ~= ex and dist <= vision.range then
-					if visibility.can_see({ x = ex, y = y }, { x = x, y = y }, vision, wall) then
-						out[x].alert = out[x].alert + 1
-					else
-						out[x].idle = out[x].idle + 1
-					end
+				local cell = row[x]
+				if cell ~= nil and cell.type ~= "WALL" and visibility.can_see({ x = ex, y = y }, { x = x, y = y }, vision, wall) then
+					out[x] = out[x] + 1
 				end
 			end
 		end
@@ -88,15 +86,17 @@ function M.threat(row, y)
 	return out
 end
 
--- Стиль угрозы клетки: вид ("alert" | "idle" | nil) и непрозрачность 0..1.
-function M.threat_style(t)
-	if t.alert > 0 then
-		return "alert", math.min(1, PER_ENEMY * t.alert)
+-- Непрозрачность оранжевого оверлея для клетки, видимую count врагам; nil — оверлея нет.
+function M.vision_alpha(count)
+	if count <= 0 then
+		return nil
 	end
-	if t.idle > 0 then
-		return "idle", math.min(1, PER_ENEMY * t.idle)
-	end
-	return nil, 0
+	return math.min(1, PER_ENEMY * count)
+end
+
+-- Попадает ли игрок в поле зрения врагов своего ряда.
+function M.spotted(vision_row, player_x)
+	return vision_row[player_x] > 0
 end
 
 -- Точки пунктирной линии от (ax, ay) до (bx, by), без концов (они внутри клеток).
