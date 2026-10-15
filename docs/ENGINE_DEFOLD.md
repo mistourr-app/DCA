@@ -75,6 +75,7 @@
 - Сигнатура go.animate: (url, property, playback, to, easing, duration, delay, complete_function) — complete_function передаётся только 8-м аргументом, 7-й это delay; вызов с колбэком на месте delay = "bad argument #7 (number expected, got function)".
 - Сигнатура gui.animate ДРУГАЯ: (node, property, to, easing, duration, delay, complete_function, playback) — playback не на 3-м месте, отмена gui.cancel_animations(node, "color"), easing gui.EASING_*. Не путать с go.animate.
 - Масштаб «подъёма» карты: анимировать надо scale компонента "#sprite", а не GO целиком — scale game object с label растягивает текст (см. выше).
+- go.property: дефолт — только литерал (число, строка, hash, vmath-конструктор с литералами); арифметика вида `26/255` не проходит линтером редактора ("invalid numeric argument"), значения пересчитывать заранее. В gui_script go.property запрещён в принципе ("cannot be used in this file type") — параметры передавать сообщением из .script.
 
 ## 4. Mobile-специфика
 
