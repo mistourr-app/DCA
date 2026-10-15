@@ -126,7 +126,7 @@ local function cell_view(cell)
 	local sym = SYMBOL[cell.type] or SYMBOL.EMPTY
 	local text = sym.text
 	if cell.type == "ENEMY" then
-		local t = registry.enemies.types[c.enemy]
+		local t = registry.enemies.types[cell.enemy]
 		text = t.label:sub(1, 1) .. tostring(cell.hp or t.base_hp)
 	end
 	return text, sym.fill, sym.ink
