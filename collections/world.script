@@ -2,7 +2,9 @@
 -- Вся логика — в core/. Здесь: прокрутка ряда, карты клеток, тап, лагерь, смерть, сохранение.
 -- Клетки — персистентные объекты в контейнере rows: diff-синхронизация по содержимому,
 -- полное пересоздание только при выходе ряда из окна (нужно для будущих анимаций).
--- Анимаций пока нет: события применяются сразу (анимации — позже по anim.*).
+-- Анимации: перемещение и скролл (anim.move_ms, этап B); остальные события применяются сразу
+-- (этапы C/D). Логика не ждёт анимацию: ввод блокируется на время таймлайна, синхронизация
+-- вью — по его завершении.
 -- Все тексты на экране — английские (docs/CONVENTIONS.md §1).
 
 local run = require("core.run")
@@ -332,6 +334,40 @@ local function refresh(self)
 	end
 end
 
+-- Таймлайн перемещения: карта игрока приподнимается, летит в новую клетку, контейнер рядов
+-- скроллится одновременно с ней; старт и финиш совпадают (anim.move_ms). done вызывается,
+-- когда все анимации завершились; до этого ввод блокирован. Победный прыжок на чекпоинт
+-- (boss_victory) и вход на арену — тот же таймлайн.
+local function play_move(self, from_x, from_y, done)
+	if self.player_go == nil then
+		done()
+		return
+	end
+	self.input_locked = true
+	local move_s = design.anim.move_ms / 1000
+	local pr = self.world.pos.y
+	go.cancel_animations(self.player_go, "position")
+	go.cancel_animations(self.rows_id, "position")
+	go.set(self.player_go, "position",
+		vmath.vector3(layout.cell_x(from_x), layout.world_center(from_y), Z_ACTOR))
+	go.set(self.rows_id, "position", vmath.vector3(0, layout.container_y(from_y), 0))
+	local pending = 2
+	local function finish()
+		pending = pending - 1
+		if pending == 0 then
+			self.input_locked = false
+			done()
+		end
+	end
+	msg.post(self.player_go, "lift", { lift = design.anim.lift_scale, duration = move_s / 2 })
+	go.animate(self.player_go, "position", go.PLAYBACK_ONCE_FORWARD,
+		vmath.vector3(layout.cell_x(self.world.pos.x), layout.world_center(pr), Z_ACTOR),
+		vmath.EASE_IN_OUT_QUAD, move_s, finish)
+	go.animate(self.rows_id, "position", go.PLAYBACK_ONCE_FORWARD,
+		vmath.vector3(0, layout.container_y(pr), 0),
+		vmath.EASE_IN_OUT_QUAD, move_s, finish)
+end
+
 -- Текст HUD и кнопки внизу экрана.
 local function sync_hud(self)
 	local p = self.player
@@ -481,8 +517,11 @@ local function arena_outcome(self)
 end
 
 -- Ход в бою: перемещение или атака клеткой, затем ход босса (если бой продолжается).
+-- Карта игрока летит по своему ряду (победа — прыжок на чекпоинт тем же таймлайном).
 local function arena_move(self, x)
 	local a = self.arena
+	local from_x = a.player_x
+	local from_y = self.world.pos.y
 	local ok, events = arena.player_move(a, x)
 	if not ok then
 		print("refused: " .. events)
@@ -500,7 +539,13 @@ local function arena_move(self, x)
 	self.world.pos.x = a.player_x
 	arena_outcome(self)
 	sync_hud(self)
-	refresh(self)
+	if self.world.mode == MODES.DEATH then
+		refresh(self)
+		return
+	end
+	play_move(self, from_x, from_y, function()
+		refresh(self)
+	end)
 end
 
 local function arena_shoot(self)
@@ -521,6 +566,8 @@ end
 -- Ход на клетку / бой / выстрел только в режиме WORLD.
 local function world_action(self, action_type, x, row)
 	local events, ok
+	local from_x = self.world.pos.x
+	local from_y = self.world.pos.y
 	-- Шаг на нижний ряд арены: игрок встаёт на него и входит в бой. Обычные клетки там не используются.
 	if action_type == "step" and is_arena_bottom(row) then
 		local moved, reason = world.move(self.world, { x = x, y = row })
@@ -531,7 +578,9 @@ local function world_action(self, action_type, x, row)
 		self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
 		enter_arena(self)
 		sync_hud(self)
-		refresh(self)
+		play_move(self, from_x, from_y, function()
+			refresh(self)
+		end)
 		return
 	end
 	if action_type == "step" then
@@ -554,7 +603,13 @@ local function world_action(self, action_type, x, row)
 		end
 	end
 	sync_hud(self)
-	refresh(self)
+	if ok and has_event(events, "move") then
+		play_move(self, from_x, from_y, function()
+			refresh(self)
+		end)
+	else
+		refresh(self)
+	end
 end
 
 function init(self)
@@ -569,6 +624,7 @@ function init(self)
 	self.rows = {}
 	self.cards = {}
 	self.fx = {}
+	self.input_locked = false
 	self.player_go = nil
 	self.boss_go = nil
 	self.world = world.new(self.seed, 0)
@@ -628,6 +684,9 @@ end
 function on_input(self, action_id, action)
 	if action_id ~= hash("touch") or not action.pressed then
 		return false
+	end
+	if self.input_locked then
+		return true
 	end
 	local mode = self.world.mode
 	if mode == MODES.DEATH then

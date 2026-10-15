@@ -13,9 +13,10 @@ screen.arenaRowScale,2,height of one arena row relative to a normal row; the two
 # --- Animation durations (ms) ---
 anim.move_ms,250,
 anim.poke_ms,100,
-anim.death_ms,700,
+anim.death_ms,400,
 anim.lunge_ms,150,
 anim.shot_ms,100,
+anim.lift_scale,1.15,scale of the card sprite while moving; label is not scaled so text does not stretch
 screen.dashStep,16,spacing of dashes for the shot line, logical px (temporary, visual not final)
 screen.dashSize,4,size of one dash, logical px (temporary)
 screen.borderWidth,4,thickness of highlight outlines in the gap between cells (logical px)
