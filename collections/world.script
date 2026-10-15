@@ -1,10 +1,9 @@
 -- Скрипт мира: связка core/* с экраном (docs/ARCHITECTURE.md §5, §9).
--- Вся логика — в core/. Здесь: прокрутка ряда, карты клеток, тап, лагерь, смерть, сохранение.
--- Клетки — персистентные объекты в контейнере rows: diff-синхронизация по содержимому,
--- полное пересоздание только при выходе ряда из окна (нужно для будущих анимаций).
--- Анимации: перемещение и скролл (anim.move_ms, этап B); остальные события применяются сразу
--- (этапы C/D). Логика не ждёт анимацию: ввод блокируется на время таймлайна, синхронизация
--- вью — по его завершении.
+-- Вся логика — в core/. Здесь: прокрутка ряда, карты клеток, тап, лагерь, смерть, сохранение
+-- и проигрывание событий ядра (этап C: выпады, падение карт, всплывающие цифры).
+-- Клетки — персистентные объекты в контейнере rows: diff-синхронизация по содержимому.
+-- Логика не ждёт анимацию: события применяются сразу, экран проигрывает таймлайн,
+-- ввод блокирован до его конца, финальная синхронизация вью — в done.
 -- Все тексты на экране — английские (docs/CONVENTIONS.md §1).
 
 local run = require("core.run")
@@ -31,13 +30,14 @@ local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
 -- Слои отрисовки (position.z). Default-камера Defold рендерит только z в [-1..1], вне диапазона
 -- объект молча не рисуется; больше z = ближе к камере; равный z = порядок не определён.
 -- label в cell.go поднят на +0.2 внутри GO: «содержимое» клетки остаётся поверх слоя угроз.
--- Клетки < слой угроз < персонажи < красный «вас видят» (под своей надписью) < обводки < пунктир.
+-- Клетки < слой угроз < персонажи < красный «вас видят» < обводки < пунктир < цифры.
 local Z_CELL = 0
 local Z_THREAT = 0.1
 local Z_ACTOR = 0.3
 local Z_SPOTTED = 0.4
 local Z_OUTLINE = 0.6
 local Z_DASH = 0.7
+local Z_POPUP = 0.8
 
 -- Зазор между клетками: спрайты клеток, оверлеи и обводки входят в него с отступом.
 local GAP = 8
@@ -67,6 +67,14 @@ local DOT_COLOR = rgb(255, 255, 255)
 -- Зрение врагов: оранжевый оверлей на видимые клетки; красный — клетка игрока, когда его видят.
 local VISION_COLOR = rgb(255, 115, 27)
 local SPOTTED_COLOR = rgb(255, 31, 31)
+
+-- Цифры (GDD §16): урон — красный, лечение — зелёный, золото — жёлтый.
+local POPUP = {
+	damage = rgb(255, 31, 31),
+	heal = rgb(16, 185, 129),
+	gold = rgb(255, 231, 97),
+}
+local FLASH_WHITE = rgb(255, 255, 255)
 
 local function has_event(events, type_)
 	for _, e in ipairs(events) do
@@ -118,7 +126,7 @@ local function cell_view(cell)
 	local sym = SYMBOL[cell.type] or SYMBOL.EMPTY
 	local text = sym.text
 	if cell.type == "ENEMY" then
-		local t = registry.enemies.types[cell.enemy]
+		local t = registry.enemies.types[c.enemy]
 		text = t.label:sub(1, 1) .. tostring(cell.hp or t.base_hp)
 	end
 	return text, sym.fill, sym.ink
@@ -184,6 +192,40 @@ local function draw_threat(self, cx, cy, h, color, alpha, z)
 		vmath.vector4(color.x, color.y, color.z, alpha), z)
 end
 
+-- Всплывающая цифра над клеткой (x, y); dx — разброс при нескольких цифрах на одной клетке.
+local function spawn_popup(self, x, y, text, color, dx)
+	local px = layout.cell_x(x) + (dx or 0)
+	local py = layout.world_center(y) + layout.row_height(y) * 0.2
+	local id = factory.create("#popup_factory", vmath.vector3(px, py, Z_POPUP))
+	if id == nil then
+		print("popup create failed: label buffer full (raise [label] max_count in game.project)")
+		return
+	end
+	go.set_parent(id, self.rows_id, false)
+	msg.post(id, "show", {
+		text = text, color = color,
+		duration = design.anim.float_ms / 1000,
+		rise = design.anim.float_rise,
+	})
+end
+
+-- id карты клетки (x, y) из последней синхронизации; nil — карты нет на экране.
+local function card_id_at(self, x, y)
+	local rowmap = self.cards[y]
+	local card = rowmap and rowmap[x]
+	if card == nil then
+		return nil
+	end
+	return card.id
+end
+
+-- Смещение выпада: от центра клетки (x0, y0) в сторону (x1, y1), доля distance fraction.
+local function lunge_offset(x0, y0, x1, y1, fraction)
+	local dx = layout.cell_x(x1) - layout.cell_x(x0)
+	local dy = layout.world_center(y1) - layout.world_center(y0)
+	return vmath.vector3(dx * fraction, dy * fraction, 0)
+end
+
 -- Нижний ряд арены (ряд игрока): ряд типа boss с остатком периода (PERIOD - ARENA_ROWS).
 local PERIOD = balance.boss.period
 local ARENA_ROWS = balance.boss.arenaRows
@@ -194,6 +236,7 @@ end
 
 -- Diff-синхронизация видимых клеток: создаём новые, обновляем изменившиеся,
 -- удаляем вышедшие из окна. Ряды ниже игрока не видны и не хранятся как объекты.
+-- Смена содержимого сбрасывает позицию карты: анимации (fall/lunge) могли её сместить.
 local function sync_cells(self, pr)
 	local new_cards = {}
 	for _, y in ipairs(layout.visible_rows(pr)) do
@@ -212,6 +255,7 @@ local function sync_cells(self, pr)
 					card = { id = id, sig = sig }
 				end
 			elseif card.sig ~= sig then
+				go.set(card.id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), Z_CELL))
 				local text, fill, ink = cell_view(cell)
 				msg.post(card.id, "set", card_msg(x, y, text, fill, ink))
 				card.sig = sig
@@ -334,18 +378,80 @@ local function refresh(self)
 	end
 end
 
+-- ================= Анимации =================
+
+-- Таймлайн: последовательность шагов function(next). Ввод блокирован до конца; done — финал.
+local function play_timeline(self, steps, done)
+	self.anim_steps = steps
+	self.anim_done = done
+	self.input_locked = true
+	local function advance()
+		local f = table.remove(self.anim_steps, 1)
+		if f == nil then
+			self.input_locked = false
+			self.anim_done()
+			return
+		end
+		f(advance)
+	end
+	advance()
+end
+
+-- Шаги, которым нужен ответ карты, регистрируют продолжение по токену;
+-- карта шлёт "anim_done" {token} в sender своего сообщения.
+function on_message(self, message_id, message, sender)
+	if message_id == hash("anim_done") and message.token ~= nil then
+		local cont = self.anim_waiters[message.token]
+		if cont ~= nil then
+			self.anim_waiters[message.token] = nil
+			cont()
+		end
+	end
+end
+
+-- Шаг: отправить карте анимационное сообщение и дождаться "anim_done".
+-- Нет карты (вне экрана) — шаг проходит сразу.
+local function card_anim(self, id, name, payload)
+	return function(next)
+		if id == nil then
+			next()
+			return
+		end
+		self.anim_token = self.anim_token + 1
+		self.anim_waiters[self.anim_token] = next
+		payload.token = self.anim_token
+		msg.post(id, name, payload)
+	end
+end
+
+-- Шаг: несколько подшагов параллельно, next — когда все закончились.
+local function parallel(steps)
+	return function(next)
+		local left = #steps
+		if left == 0 then
+			next()
+			return
+		end
+		local function once()
+			left = left - 1
+			if left == 0 then
+				next()
+			end
+		end
+		for _, s in ipairs(steps) do
+			s(once)
+		end
+	end
+end
+
 -- Таймлайн перемещения: карта игрока приподнимается, летит в новую клетку, контейнер рядов
--- скроллится одновременно с ней; старт и финиш совпадают (anim.move_ms). done вызывается,
--- когда все анимации завершились; до этого ввод блокирован. Победный прыжок на чекпоинт
--- (boss_victory) и вход на арену — тот же таймлайн.
-local function play_move(self, from_x, from_y, done)
+-- скроллится одновременно с ней; старт и финиш совпадают (anim.move_ms).
+local function play_move(self, from_x, from_y, to_x, to_y, done)
 	if self.player_go == nil then
 		done()
 		return
 	end
-	self.input_locked = true
 	local move_s = design.anim.move_ms / 1000
-	local pr = self.world.pos.y
 	go.cancel_animations(self.player_go, "position")
 	go.cancel_animations(self.rows_id, "position")
 	go.set(self.player_go, "position",
@@ -355,17 +461,248 @@ local function play_move(self, from_x, from_y, done)
 	local function finish()
 		pending = pending - 1
 		if pending == 0 then
-			self.input_locked = false
 			done()
 		end
 	end
 	msg.post(self.player_go, "lift", { lift = design.anim.lift_scale, duration = move_s / 2 })
 	go.animate(self.player_go, "position", go.PLAYBACK_ONCE_FORWARD,
-		vmath.vector3(layout.cell_x(self.world.pos.x), layout.world_center(pr), Z_ACTOR),
+		vmath.vector3(layout.cell_x(to_x), layout.world_center(to_y), Z_ACTOR),
 		go.EASING_INOUTQUAD, move_s, 0, finish)
 	go.animate(self.rows_id, "position", go.PLAYBACK_ONCE_FORWARD,
-		vmath.vector3(0, layout.container_y(pr), 0),
+		vmath.vector3(0, layout.container_y(to_y), 0),
 		go.EASING_INOUTQUAD, move_s, 0, finish)
+end
+
+local function slide_step(self, from_x, from_y, to_x, to_y)
+	return function(next)
+		play_move(self, from_x, from_y, to_x, to_y, next)
+	end
+end
+
+-- Падение поверженной карты: вниз с уходом в прозрачность (GDD §16, событие death/enemy_dead).
+local function fall_message(id, y)
+	msg.post(id, "fall", {
+		offset = vmath.vector3(0, -layout.row_height(y) * 0.8, 0),
+		duration = design.anim.death_ms / 1000,
+	})
+end
+
+-- ================= Таймлайны событий хода =================
+
+-- run.step: атаки «в спину» (выпад врага к игроку, цифры на игроке), перемещение,
+-- затем подбор (цифры на приземлении) или падение карты игрока при смерти.
+local function steps_step(self, from_x, from_y, events)
+	local steps = {}
+	local behinds, move, gold, heal, died = {}, nil, nil, nil, false
+	for _, e in ipairs(events) do
+		if e.type == "behind_attack" then
+			table.insert(behinds, e)
+		elseif e.type == "move" then
+			move = e
+		elseif e.type == "gold" then
+			gold = e
+		elseif e.type == "heal" then
+			heal = e
+		elseif e.type == "death" then
+			died = true
+		end
+	end
+	if #behinds > 0 then
+		local inner = {}
+		for i, e in ipairs(behinds) do
+			spawn_popup(self, from_x, from_y, "-" .. e.damage, POPUP.damage, (i - 1) * 42 - 20)
+			table.insert(inner, card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
+				offset = lunge_offset(e.enemy_x, from_y, from_x, from_y, 0.6),
+				duration = design.anim.poke_ms / 1000,
+			}))
+		end
+		table.insert(steps, parallel(inner))
+	end
+	if died then
+		table.insert(steps, card_anim(self, self.player_go, "fall", {
+			offset = vmath.vector3(0, -layout.row_height(from_y) * 0.8, 0),
+			duration = design.anim.death_ms / 1000,
+		}))
+		return steps
+	end
+	if move ~= nil then
+		table.insert(steps, slide_step(self, from_x, from_y, self.world.pos.x, self.world.pos.y))
+	end
+	if gold ~= nil or heal ~= nil then
+		local lx, ly = self.world.pos.x, self.world.pos.y
+		table.insert(steps, function(next)
+			if heal ~= nil then
+				spawn_popup(self, lx, ly, "+" .. heal.amount, POPUP.heal, 0)
+			end
+			if gold ~= nil then
+				spawn_popup(self, lx, ly, "+" .. gold.amount, POPUP.gold, 40)
+			end
+			next()
+		end)
+	end
+	return steps
+end
+
+-- run.melee: выпад игрока к карте врага, возврат-отскок, цифры урона с обеих карт,
+-- падение карты врага, переход на её клетку; при гибели игрока падает его карта.
+local function steps_melee(self, from_x, from_y, tx, ty, events)
+	local steps = {}
+	local poke, dead, died
+	for _, e in ipairs(events) do
+		if e.type == "poke" then
+			poke = e
+		elseif e.type == "enemy_dead" then
+			dead = e
+		elseif e.type == "death" then
+			died = true
+		end
+	end
+	if poke == nil then
+		return steps
+	end
+	local player_card = self.player_go
+	local enemy_card = card_id_at(self, tx, ty)
+	table.insert(steps, card_anim(self, player_card, "lunge", {
+		offset = lunge_offset(from_x, from_y, tx, ty, 0.6),
+		duration = design.anim.poke_ms / 1000,
+	}))
+	table.insert(steps, function(next)
+		-- Отскок завершён: цифры урона, поверженный враг падает вниз экрана.
+		spawn_popup(self, tx, ty, "-" .. poke.dealt_to_enemy, POPUP.damage, 0)
+		spawn_popup(self, from_x, from_y, "-" .. poke.dealt_to_player, POPUP.damage, 40)
+		if dead ~= nil then
+			if enemy_card ~= nil then
+				fall_message(enemy_card, ty)
+			end
+			table.insert(steps, slide_step(self, from_x, from_y, tx, ty))
+		else
+			table.insert(steps, card_anim(self, player_card, "fall", {
+				offset = vmath.vector3(0, -layout.row_height(from_y) * 0.8, 0),
+				duration = design.anim.death_ms / 1000,
+			}))
+		end
+		next()
+	end)
+	return steps
+end
+
+-- run.shoot: цифры урона, белая вспышка карты врага (GDD §16), падение при гибели.
+local function steps_shoot(self, x, events)
+	local steps = {}
+	local shot, dead
+	for _, e in ipairs(events) do
+		if e.type == "shot" then
+			shot = e
+		elseif e.type == "enemy_dead" then
+			dead = e
+		end
+	end
+	if shot == nil then
+		return steps
+	end
+	local y = self.world.pos.y
+	local id = card_id_at(self, x, y)
+	table.insert(steps, function(next)
+		spawn_popup(self, x, y, "-" .. shot.damage, POPUP.damage, 0)
+		next()
+	end)
+	table.insert(steps, card_anim(self, id, "flash", {
+		color = FLASH_WHITE,
+		duration = design.anim.shot_ms / 1000,
+	}))
+	if dead ~= nil and id ~= nil then
+		table.insert(steps, function(next)
+			fall_message(id, y)
+			next()
+		end)
+	end
+	return steps
+end
+
+-- Арена: слайд игрока по своему ряду, атака клеткой — выпад к боссу и цифры на нём;
+-- ход босса — выпад к игроку и цифры на игроке; победа — прыжок на чекпоинт;
+-- поражение — падение карты игрока.
+local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, events, outcome, win_target)
+	local steps = {}
+	table.insert(steps, slide_step(self, from_x, from_y, mid_x, from_y))
+	local pattack, battack, heal
+	for _, e in ipairs(events) do
+		if e.type == "player_attack" then
+			pattack = e
+		elseif e.type == "boss_attack" then
+			battack = e
+		elseif e.type == "heal" then
+			heal = e
+		end
+	end
+	if pattack ~= nil then
+		table.insert(steps, card_anim(self, self.player_go, "lunge", {
+			offset = lunge_offset(mid_x, from_y, boss_from_x, from_y + 1, 0.55),
+			duration = design.anim.poke_ms / 1000,
+		}))
+		table.insert(steps, function(next)
+			spawn_popup(self, boss_from_x, from_y + 1, "-" .. pattack.damage, POPUP.damage, 0)
+			next()
+		end)
+	end
+	if heal ~= nil then
+		table.insert(steps, function(next)
+			spawn_popup(self, mid_x, from_y, "+" .. balance.cells.HEAL.amount, POPUP.heal, 0)
+			next()
+		end)
+	end
+	if battack ~= nil then
+		if boss_to_x ~= boss_from_x then
+			-- Сначала босс переезжает в новую колонку, потом бьёт оттуда.
+			table.insert(steps, function(next)
+				local id = self.boss_go
+				if id == nil then
+					next()
+					return
+				end
+				go.animate(id, "position", go.PLAYBACK_ONCE_FORWARD,
+					vmath.vector3(layout.cell_x(boss_to_x), layout.world_center(from_y + 1), Z_ACTOR),
+					go.EASING_INOUTQUAD, design.anim.move_ms / 1000, 0, next)
+			end)
+		end
+		table.insert(steps, card_anim(self, self.boss_go, "lunge", {
+			offset = lunge_offset(boss_to_x, from_y + 1, mid_x, from_y, 0.55),
+			duration = design.anim.poke_ms / 1000,
+		}))
+		table.insert(steps, function(next)
+			spawn_popup(self, mid_x, from_y, "-" .. battack.damage, POPUP.damage, 0)
+			if outcome == "defeat" then
+				table.insert(steps, card_anim(self, self.player_go, "fall", {
+					offset = vmath.vector3(0, -layout.row_height(from_y) * 0.8, 0),
+					duration = design.anim.death_ms / 1000,
+				}))
+			end
+			next()
+		end)
+	end
+	if outcome == "victory" and win_target ~= nil then
+		table.insert(steps, slide_step(self, mid_x, from_y, win_target.x, win_target.y))
+	end
+	return steps
+end
+
+-- Арена: выстрел по боссу — вспышка его карты и цифры; победа — прыжок на чекпоинт.
+local function steps_arena_shot(self, boss_x, row, shot, won, win_target)
+	local steps = {}
+	if shot ~= nil then
+		table.insert(steps, function(next)
+			spawn_popup(self, boss_x, row + 1, "-" .. shot.damage, POPUP.damage, 0)
+			next()
+		end)
+		table.insert(steps, card_anim(self, self.boss_go, "flash", {
+			color = FLASH_WHITE,
+			duration = design.anim.shot_ms / 1000,
+		}))
+	end
+	if won and win_target ~= nil then
+		table.insert(steps, slide_step(self, self.world.pos.x, row, win_target.x, win_target.y))
+	end
+	return steps
 end
 
 -- Текст HUD и кнопки внизу экрана.
@@ -394,6 +731,12 @@ local function sync_hud(self)
 	})
 end
 
+-- Синхронизация экрана по завершении таймлайна.
+local function finish_view(self)
+	sync_hud(self)
+	refresh(self)
+end
+
 -- Клетки ряда точки возврата сохраняются целиком: этот ряд не пересоздаётся между сессиями.
 local function return_point_for_save(self)
 	local rp = self.world.return_point
@@ -420,9 +763,6 @@ local function apply_events(self, events)
 	for _, e in ipairs(events) do
 		if e.type == "death" then
 			print("DEATH at row " .. self.world.pos.y)
-			for _, ev in ipairs(events) do
-				print("  event " .. ev.type .. (ev.damage and (" damage=" .. ev.damage) or "") .. (ev.hp and (" hp=" .. ev.hp) or ""))
-			end
 			world.transition(self.world, MODES.DEATH)
 		elseif e.type == "refused" then
 			print("refused: " .. e.reason)
@@ -452,8 +792,7 @@ local function respawn(self)
 	end
 	print("respawn at " .. self.world.return_point.kind .. ", gold lost: " .. lost)
 	save(self)
-	sync_hud(self)
-	refresh(self)
+	finish_view(self)
 end
 
 local function make_camp(self)
@@ -473,8 +812,7 @@ local function make_camp(self)
 	self.player.hp = self.player.max_hp
 	equipment.restore(self.player.weapon)
 	save(self)
-	sync_hud(self)
-	refresh(self)
+	finish_view(self)
 end
 
 local function leave_camp(self)
@@ -517,55 +855,74 @@ local function arena_outcome(self)
 end
 
 -- Ход в бою: перемещение или атака клеткой, затем ход босса (если бой продолжается).
--- Карта игрока летит по своему ряду (победа — прыжок на чекпоинт тем же таймлайном).
 local function arena_move(self, x)
 	local a = self.arena
 	local from_x = a.player_x
 	local from_y = self.world.pos.y
+	local boss_from_x = a.boss_x
 	local ok, events = arena.player_move(a, x)
 	if not ok then
 		print("refused: " .. events)
 		return
 	end
+	local boss_to_x = boss_from_x
 	if arena.result(a) == nil then
 		local boss_events = arena.boss_turn(a)
 		for _, e in ipairs(boss_events) do
 			table.insert(events, e)
+			if e.type == "boss_move" then
+				boss_to_x = e.x
+			end
 		end
 	end
 	-- Завершённый ход игрока в арене, как в мире: тикает таймер перезарядки (GDD §7).
 	equipment.tick(self.player.weapon)
 	self.player.hp = a.player_hp
 	self.world.pos.x = a.player_x
-	arena_outcome(self)
-	sync_hud(self)
-	if self.world.mode == MODES.DEATH then
-		refresh(self)
-		return
+	local outcome = arena_outcome(self)
+	local win_target = nil
+	if outcome == "victory" then
+		win_target = { x = self.world.pos.x, y = self.world.pos.y }
 	end
-	play_move(self, from_x, from_y, function()
-		refresh(self)
-	end)
+	local steps = steps_arena(self, from_x, from_y, self.world.pos.x, boss_from_x, boss_to_x,
+		events, outcome, win_target)
+	if #steps == 0 then
+		finish_view(self)
+	else
+		play_timeline(self, steps, function()
+			finish_view(self)
+		end)
+	end
 end
 
 local function arena_shoot(self)
 	local a = self.arena
+	local row = self.world.pos.y
+	local boss_x = a.boss_x
 	local range = registry.equipment.CROSSBOW.range
 	local ok, res = arena.shoot(a, self.player.weapon, self.player.weapon_damage, range)
 	if not ok then
 		print("refused: " .. tostring(res))
 		return
 	end
-	if arena.result(a) == "victory" then
+	local won = arena.result(a) == "victory"
+	local win_target = nil
+	if won then
 		arena_outcome(self)
+		win_target = { x = self.world.pos.x, y = self.world.pos.y }
 	end
-	sync_hud(self)
-	refresh(self)
+	local steps = steps_arena_shot(self, boss_x, row, res[1], won, win_target)
+	if #steps == 0 then
+		finish_view(self)
+	else
+		play_timeline(self, steps, function()
+			finish_view(self)
+		end)
+	end
 end
 
 -- Ход на клетку / бой / выстрел только в режиме WORLD.
 local function world_action(self, action_type, x, row)
-	local events, ok
 	local from_x = self.world.pos.x
 	local from_y = self.world.pos.y
 	-- Шаг на нижний ряд арены: игрок встаёт на него и входит в бой. Обычные клетки там не используются.
@@ -577,12 +934,12 @@ local function world_action(self, action_type, x, row)
 		end
 		self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
 		enter_arena(self)
-		sync_hud(self)
-		play_move(self, from_x, from_y, function()
-			refresh(self)
+		play_timeline(self, { slide_step(self, from_x, from_y, x, row) }, function()
+			finish_view(self)
 		end)
 		return
 	end
+	local ok, events
 	if action_type == "step" then
 		ok, events = run.step(self.run, x, row)
 	elseif action_type == "melee" then
@@ -591,7 +948,8 @@ local function world_action(self, action_type, x, row)
 		ok, events = run.shoot(self.run, x)
 	end
 	apply_events(self, events)
-	if ok and has_event(events, "move") then
+	local moved = ok and has_event(events, "move")
+	if moved then
 		self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
 		local pos = self.world.pos
 		if row_gen.kind(pos.y) == "checkpoint" and pos.y > self.world.return_point.row then
@@ -602,13 +960,22 @@ local function world_action(self, action_type, x, row)
 			enter_arena(self)
 		end
 	end
-	sync_hud(self)
-	if ok and has_event(events, "move") then
-		play_move(self, from_x, from_y, function()
-			refresh(self)
-		end)
+	local steps = {}
+	if ok then
+		if action_type == "melee" then
+			steps = steps_melee(self, from_x, from_y, x, row, events)
+		elseif action_type == "step" then
+			steps = steps_step(self, from_x, from_y, events)
+		else
+			steps = steps_shoot(self, x, events)
+		end
+	end
+	if #steps == 0 then
+		finish_view(self)
 	else
-		refresh(self)
+		play_timeline(self, steps, function()
+			finish_view(self)
+		end)
 	end
 end
 
@@ -625,6 +992,8 @@ function init(self)
 	self.cards = {}
 	self.fx = {}
 	self.input_locked = false
+	self.anim_waiters = {}
+	self.anim_token = 0
 	self.player_go = nil
 	self.boss_go = nil
 	self.world = world.new(self.seed, 0)
@@ -659,8 +1028,7 @@ function init(self)
 	if not found then
 		save(self)
 	end
-	sync_hud(self)
-	refresh(self)
+	finish_view(self)
 end
 
 function final(self)

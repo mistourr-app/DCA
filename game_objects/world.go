@@ -11,6 +11,10 @@ components {
   component: "/game_objects/bar_factory.factory"
 }
 components {
+  id: "popup_factory"
+  component: "/game_objects/popup_factory.factory"
+}
+components {
   id: "hud"
   component: "/gui/hud.gui"
 }

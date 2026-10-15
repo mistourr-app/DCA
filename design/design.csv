@@ -16,6 +16,8 @@ anim.poke_ms,100,
 anim.death_ms,400,
 anim.lunge_ms,150,
 anim.shot_ms,100,
+anim.float_ms,600,floating number rise and fade duration
+anim.float_rise,60,pixels a floating number rises while fading
 anim.lift_scale,1.15,scale of the card sprite while moving; label is not scaled so text does not stretch
 screen.dashStep,16,spacing of dashes for the shot line, logical px (temporary, visual not final)
 screen.dashSize,4,size of one dash, logical px (temporary)

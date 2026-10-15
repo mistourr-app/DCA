@@ -1,0 +1,17 @@
+-- Всплывающая цифра (урон/лечение/золото). Сообщение "show":
+--   text — строка, color — vector4, duration — секунды, rise — пикселей вверх.
+-- Всплывает, гаснет и удаляет себя сама.
+function on_message(self, message_id, message, sender)
+	if message_id == hash("show") then
+		go.set("#label", "text", message.text)
+		go.set("#label", "color", message.color)
+		local home = go.get_position()
+		go.animate(".", "position", go.PLAYBACK_ONCE_FORWARD,
+			home + vmath.vector3(0, message.rise, 0), go.EASING_OUTQUAD, message.duration)
+		go.animate("#label", "color", go.PLAYBACK_ONCE_FORWARD,
+			vmath.vector4(message.color.x, message.color.y, message.color.z, 0),
+			go.EASING_LINEAR, message.duration, function()
+				go.delete()
+			end)
+	end
+end

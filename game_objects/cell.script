@@ -3,13 +3,21 @@
 -- Масштаб применяется только спрайту: label масштабить нельзя — растянется текст.
 -- Сообщение "lift": {lift, duration} — подложка приподнимается (увеличивается) за duration
 -- и за duration возвращается обратно: подъём карты игрока при перемещении.
+-- Боевые сообщения (по завершении шлют отправителю "anim_done" {token}):
+--   "lunge" {offset, duration} — выпад к цели и возврат (по duration в каждую сторону);
+--   "fall"  {offset, duration} — падение поверженной карты с уходом в прозрачность;
+--   "flash" {color, duration} — вспышка подложки (попадание арбалета).
 
 local SPRITE_PX = 32
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("set") then
 		go.cancel_animations("#sprite", "scale")
+		go.cancel_animations("#sprite", "tint")
+		go.cancel_animations("#label", "color")
+		go.cancel_animations(".", "position")
 		self.base = vmath.vector3(message.width / SPRITE_PX, message.height / SPRITE_PX, 1)
+		self.color = message.color
 		go.set("#sprite", "scale", self.base)
 		go.set("#sprite", "tint", message.color)
 		go.set("#label", "color", message.text_color)
@@ -18,9 +26,42 @@ function on_message(self, message_id, message, sender)
 		go.cancel_animations("#sprite", "scale")
 		go.animate("#sprite", "scale", go.PLAYBACK_ONCE_FORWARD,
 			vmath.vector3(self.base.x * message.lift, self.base.y * message.lift, 1),
-			go.EASING_OUTBACK, message.duration, 0, function()
+			go.EASING_OUTBACK, message.duration, function()
 				go.animate("#sprite", "scale", go.PLAYBACK_ONCE_FORWARD, self.base,
 					go.EASING_INOUTQUAD, message.duration)
+			end)
+	elseif message_id == hash("lunge") then
+		go.cancel_animations(".", "position")
+		local home = go.get_position()
+		go.animate(".", "position", go.PLAYBACK_ONCE_FORWARD, home + message.offset,
+			go.EASING_OUTQUAD, message.duration, function()
+				go.animate(".", "position", go.PLAYBACK_ONCE_FORWARD, home,
+					go.EASING_INOUTQUAD, message.duration, function()
+						msg.post(sender, "anim_done", { token = message.token })
+					end)
+			end)
+	elseif message_id == hash("fall") then
+		go.cancel_animations(".", "position")
+		go.cancel_animations("#sprite", "tint")
+		go.cancel_animations("#label", "color")
+		local home = go.get_position()
+		go.animate(".", "position", go.PLAYBACK_ONCE_FORWARD, home + message.offset,
+			go.EASING_INCUBIC, message.duration)
+		go.animate("#sprite", "tint", go.PLAYBACK_ONCE_FORWARD,
+			vmath.vector4(self.color.x, self.color.y, self.color.z, 0),
+			go.EASING_LINEAR, message.duration, function()
+				msg.post(sender, "anim_done", { token = message.token })
+			end)
+		go.animate("#label", "color", go.PLAYBACK_ONCE_FORWARD,
+			vmath.vector4(0, 0, 0, 0), go.EASING_LINEAR, message.duration)
+	elseif message_id == hash("flash") then
+		go.cancel_animations("#sprite", "tint")
+		go.animate("#sprite", "tint", go.PLAYBACK_ONCE_FORWARD, message.color,
+			go.EASING_LINEAR, message.duration / 2, function()
+				go.animate("#sprite", "tint", go.PLAYBACK_ONCE_FORWARD, self.color,
+					go.EASING_LINEAR, message.duration / 2, function()
+						msg.post(sender, "anim_done", { token = message.token })
+					end)
 			end)
 	end
 end
