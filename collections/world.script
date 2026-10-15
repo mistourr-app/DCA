@@ -362,10 +362,10 @@ local function play_move(self, from_x, from_y, done)
 	msg.post(self.player_go, "lift", { lift = design.anim.lift_scale, duration = move_s / 2 })
 	go.animate(self.player_go, "position", go.PLAYBACK_ONCE_FORWARD,
 		vmath.vector3(layout.cell_x(self.world.pos.x), layout.world_center(pr), Z_ACTOR),
-		go.EASING_INOUTQUAD, move_s, finish)
+		go.EASING_INOUTQUAD, move_s, 0, finish)
 	go.animate(self.rows_id, "position", go.PLAYBACK_ONCE_FORWARD,
 		vmath.vector3(0, layout.container_y(pr), 0),
-		go.EASING_INOUTQUAD, move_s, finish)
+		go.EASING_INOUTQUAD, move_s, 0, finish)
 end
 
 -- Текст HUD и кнопки внизу экрана.

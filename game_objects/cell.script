@@ -18,7 +18,7 @@ function on_message(self, message_id, message, sender)
 		go.cancel_animations("#sprite", "scale")
 		go.animate("#sprite", "scale", go.PLAYBACK_ONCE_FORWARD,
 			vmath.vector3(self.base.x * message.lift, self.base.y * message.lift, 1),
-			go.EASING_OUTBACK, message.duration, function()
+			go.EASING_OUTBACK, message.duration, 0, function()
 				go.animate("#sprite", "scale", go.PLAYBACK_ONCE_FORWARD, self.base,
 					go.EASING_INOUTQUAD, message.duration)
 			end)
