@@ -509,16 +509,26 @@ local function steps_step(self, from_x, from_y, events)
 	end
 	if #behinds > 0 then
 		local inner = {}
-		for i, e in ipairs(behinds) do
-			spawn_popup(self, from_x, from_y, "-" .. e.damage, POPUP.damage, (i - 1) * 42 - 20)
+		for _, e in ipairs(behinds) do
 			table.insert(inner, card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
 				offset = lunge_offset(e.enemy_x, from_y, from_x, from_y, 0.6),
 				duration = design.anim.poke_ms / 1000,
 			}))
 		end
 		table.insert(steps, parallel(inner))
+		table.insert(steps, function(next)
+			for i, e in ipairs(behinds) do
+				spawn_popup(self, from_x, from_y, "-" .. e.damage, POPUP.damage, (i - 1) * 42 - 20)
+			end
+			msg.post("#hud", "flash")
+			next()
+		end)
 	end
 	if died then
+		table.insert(steps, function(next)
+			msg.post("#hud", "flash")
+			next()
+		end)
 		table.insert(steps, card_anim(self, self.player_go, "fall", {
 			offset = vmath.vector3(0, -layout.row_height(from_y) * 0.8, 0),
 			duration = design.anim.death_ms / 1000,
@@ -567,9 +577,10 @@ local function steps_melee(self, from_x, from_y, tx, ty, events)
 		duration = design.anim.poke_ms / 1000,
 	}))
 	table.insert(steps, function(next)
-		-- Отскок завершён: цифры урона, поверженный враг падает вниз экрана.
+		-- Отскок завершён: цифры урона, мигание экрана (урон по игроку), поверженный враг падает.
 		spawn_popup(self, tx, ty, "-" .. poke.dealt_to_enemy, POPUP.damage, 0)
 		spawn_popup(self, from_x, from_y, "-" .. poke.dealt_to_player, POPUP.damage, 40)
+		msg.post("#hud", "flash")
 		if dead ~= nil then
 			if enemy_card ~= nil then
 				fall_message(enemy_card, ty)
@@ -671,6 +682,7 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 		}))
 		table.insert(steps, function(next)
 			spawn_popup(self, mid_x, from_y, "-" .. battack.damage, POPUP.damage, 0)
+			msg.post("#hud", "flash")
 			if outcome == "defeat" then
 				table.insert(steps, card_anim(self, self.player_go, "fall", {
 					offset = vmath.vector3(0, -layout.row_height(from_y) * 0.8, 0),

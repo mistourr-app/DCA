@@ -1,5 +1,15 @@
--- HUD: только вывод текста и показ оверлея смерти. Ввод обрабатывает collections/world.script
--- (тап по координатам), поэтому здесь нет обработки нажатий.
+-- HUD: вывод текста, мигание экрана при уроне по игроку (GDD §16) и оверлей смерти.
+-- Ввод обрабатывает collections/world.script (тап по координатам), поэтому здесь нет
+-- обработки нажатий.
+-- Сигнатура gui.animate: (node, property, to, easing, duration, delay, complete_function,
+-- playback) — отличается от go.animate: нет playback на 3-м месте.
+
+local design = require("core.data.design")
+
+local FLASH_R = 1.0
+local FLASH_G = 0.05
+local FLASH_B = 0.05
+local FLASH_ALPHA = 0.45
 
 local function set_overlay(visible)
 	gui.set_enabled(gui.get_node("overlay"), visible)
@@ -11,11 +21,18 @@ function init(self)
 	set_overlay(false)
 end
 
--- message.top, message.bottom — строки; message.overlay — показывать ли экран смерти.
+-- "update": message.top, message.bottom — строки; message.overlay — показывать ли экран смерти.
+-- "flash": красная вспышка на весь экран, гаснет за anim.flash_ms.
 function on_message(self, message_id, message, sender)
 	if message_id == hash("update") then
 		gui.set_text(gui.get_node("top"), message.top)
 		gui.set_text(gui.get_node("bottom"), message.bottom)
 		set_overlay(message.overlay)
+	elseif message_id == hash("flash") then
+		local node = gui.get_node("flash")
+		gui.cancel_animations(node, "color")
+		gui.set_color(node, vmath.vector4(FLASH_R, FLASH_G, FLASH_B, FLASH_ALPHA))
+		gui.animate(node, "color", vmath.vector4(FLASH_R, FLASH_G, FLASH_B, 0),
+			gui.EASING_OUTQUAD, design.anim.flash_ms / 1000)
 	end
 end

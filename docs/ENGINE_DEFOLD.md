@@ -72,7 +72,8 @@
 - Z-слои 2D: default-камера (stretch projection) рендерит только z в диапазоне [-1..1]. Объект с z вне диапазона НЕ рисуется молча, без ошибок в логе (проверено: z=10..30 — объекты исчезли). Больше z = ближе к камере (рисуется позже); равный z = порядок не определён, возможны мигания. Итоговый z = z game object + z компонента + z родительских GO. Все z-константы — в collections/world.script, держим в (0..1); надписи клеток подняты на +0.2 компонентом в cell.go, чтобы слой угроз (0.1) не перекрывал текст.
 - Уже проверено в 1.14.0: у label нет полей text_leading, text_tracking, align, blend_mode; у gui нет значений ADJUST_FIT, ADJUST_STRETCH.
 - Easing для go.animate: константы в пространстве go.EASING_* (go.EASING_INOUTQUAD, go.EASING_OUTBACK и т.п.). Имени vmath.EASE_* не существует; nil в аргументе easing даёт runtime error "easing must be either a easing constant or a vmath.vector" в момент вызова animate.
-- Сигнатура go.animate: (url, property, playback, to, easing, duration, delay, complete_function) — complete_function передаётся только 8-м аргументом, 7-й это delay; колбэк на месте delay = "bad argument #7 (number expected, got function)".
+- Сигнатура go.animate: (url, property, playback, to, easing, duration, delay, complete_function) — complete_function передаётся только 8-м аргументом, 7-й это delay; вызов с колбэком на месте delay = "bad argument #7 (number expected, got function)".
+- Сигнатура gui.animate ДРУГАЯ: (node, property, to, easing, duration, delay, complete_function, playback) — playback не на 3-м месте, отмена gui.cancel_animations(node, "color"), easing gui.EASING_*. Не путать с go.animate.
 - Масштаб «подъёма» карты: анимировать надо scale компонента "#sprite", а не GO целиком — scale game object с label растягивает текст (см. выше).
 
 ## 4. Mobile-специфика
