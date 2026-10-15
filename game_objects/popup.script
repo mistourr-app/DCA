@@ -1,18 +1,26 @@
 -- Всплывающая цифра (урон/лечение/золото). Сообщение "show":
---   text — строка, color — vector4, duration — секунды, rise — пикселей вверх.
--- Всплывает, гаснет и удаляет себя сама.
--- Сигнатура go.animate: (url, property, playback, to, easing, duration, delay, complete_function)
--- — колбэк только 8-м аргументом.
+--   text — строка, kind — "damage" | "heal" | "gold" (цвет берётся из свойства скрипта).
+-- Всплывает на float_rise пикселей, гаснет за float_ms и удаляет себя сама.
+-- go.animate: (url, property, playback, to, easing, duration, delay, complete_function).
+
+go.property("float_ms", 600)
+go.property("float_rise", 60)
+go.property("color_damage", vmath.vector4(1, 31 / 255, 31 / 255, 1))
+go.property("color_heal", vmath.vector4(16 / 255, 185 / 255, 129 / 255, 1))
+go.property("color_gold", vmath.vector4(1, 231 / 255, 97 / 255, 1))
+
 function on_message(self, message_id, message, sender)
 	if message_id == hash("show") then
+		local color = self["color_" .. (message.kind or "damage")] or self.color_damage
+		local duration_s = self.float_ms / 1000
 		go.set("#label", "text", message.text)
-		go.set("#label", "color", message.color)
+		go.set("#label", "color", color)
 		local home = go.get_position()
 		go.animate(".", "position", go.PLAYBACK_ONCE_FORWARD,
-			home + vmath.vector3(0, message.rise, 0), go.EASING_OUTQUAD, message.duration)
+			home + vmath.vector3(0, self.float_rise, 0), go.EASING_OUTQUAD, duration_s)
 		go.animate("#label", "color", go.PLAYBACK_ONCE_FORWARD,
-			vmath.vector4(message.color.x, message.color.y, message.color.z, 0),
-			go.EASING_LINEAR, message.duration, 0, function()
+			vmath.vector4(color.x, color.y, color.z, 0),
+			go.EASING_LINEAR, duration_s, 0, function()
 				go.delete()
 			end)
 	end

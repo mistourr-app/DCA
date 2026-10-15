@@ -20,8 +20,6 @@ local M = {}
 local COLUMNS = grid.COLUMNS
 local PER_ENEMY = design.screen.threatAlpha
 
-M.DASH_STEP = design.screen.dashStep
-
 local function wall_fn(row)
 	return function(x)
 		local c = row and row[x]

@@ -1,5 +1,9 @@
-# design.csv: экран и презентация. Не влияет на правила игры.
-# Правила и числа баланса — в balance/balance.csv.
+# design.csv: числа, которые читает core/ (геометрия поля и прозрачность слоя угроз).
+# Не влияет на правила игры (правила — в balance/balance.csv), но доступно core/*,
+# который не видит Defold и go.property.
+# Остальные презентационные числа (длительности и кривые анимаций, палитра, размеры
+# обводок и пунктира) — go.property скриптов экрана: world.script, cell.script,
+# popup.script, hud.gui_script. Правило: docs/AI_CODING_RULES.md, раздел "источники чисел".
 # Формат: path,value,notes. Генерация: python tools/build_balance.py -> core/data/design.lua.
 
 # --- Screen (logical pixels, portrait 720x1280) ---
@@ -9,18 +13,4 @@ screen.visibleRows,4,rows shown: current row plus rows ahead; the rest is fog of
 screen.marginTop,100,space above the field for HUD
 screen.marginBottom,120,space below the field for the camp button
 screen.arenaRowScale,2,height of one arena row relative to a normal row; the two arena rows fill the field
-
-# --- Animation durations (ms) ---
-anim.move_ms,250,
-anim.poke_ms,100,
-anim.death_ms,400,
-anim.lunge_ms,150,
-anim.shot_ms,100,
-anim.float_ms,600,floating number rise and fade duration
-anim.float_rise,60,pixels a floating number rises while fading
-anim.flash_ms,150,screen flash when the player takes damage (GDD 16)
-anim.lift_scale,1.15,scale of the card sprite while moving; label is not scaled so text does not stretch
-screen.dashStep,16,spacing of dashes for the shot line, logical px (temporary, visual not final)
-screen.dashSize,4,size of one dash, logical px (temporary)
-screen.borderWidth,4,thickness of highlight outlines in the gap between cells (logical px)
 screen.threatAlpha,0.25,opacity of the threat overlay per enemy seeing the cell, capped at 1 (GDD 5.4)
