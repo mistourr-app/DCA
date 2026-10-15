@@ -2,12 +2,14 @@
 -- Чистая логика. Логическое разрешение 720x1280 (design/design.csv, раздел screen.*),
 -- начало координат снизу слева.
 --
--- Обычный режим: видны VISIBLE_ROWS рядов (ряд игрока внизу и ряды над ним), высота ряда CELL_H.
--- Режим боя на арене: видны только два ряда арены (ряд игрока и ряд босса). Высота каждого
--- ряда арены ARENA_H = CELL_H * arenaRowScale, поэтому два ряда занимают всё поле.
+-- Поле — контейнер рядов: клетки живут в «пространстве рядов» (координата вверх по номеру
+-- ряда), контейнер сдвигается так, чтобы ряд игрока стоял у нижнего края поля. Питч рядов
+-- неоднороден: обычные ряды CELL_H, ряды арены (kind = "boss") ARENA_H = CELL_H * arenaRowScale.
+-- Карта высот — кусочно-линейная формула по номеру ряда, без хранения промежуточных значений.
 
 local design = require("core.data.design")
 local balance = require("core.data.balance")
+local row_gen = require("core.row_gen")
 
 local M = {}
 
@@ -22,24 +24,70 @@ M.ARENA_SCALE = design.screen.arenaRowScale
 M.CELL_W = math.floor(M.WIDTH / M.COLUMNS)
 M.CELL_H = math.floor((M.HEIGHT - M.MARGIN_TOP - M.MARGIN_BOTTOM) / M.VISIBLE_ROWS)
 M.ARENA_H = M.CELL_H * M.ARENA_SCALE
+-- Высота игрового поля между отступами.
+M.FIELD_H = M.HEIGHT - M.MARGIN_TOP - M.MARGIN_BOTTOM
+
+local PERIOD = balance.boss.period
+local ARENA_ROWS = balance.boss.arenaRows
+local NORMAL_BAND = PERIOD - ARENA_ROWS
+-- Высота одного цикла периода: обычные ряды + ряды арены.
+local CYCLE_H = NORMAL_BAND * M.CELL_H + ARENA_ROWS * M.ARENA_H
+
+-- Высота ряда по его номеру: ряды арены вдвое выше обычных (GDD §12.1).
+function M.row_height(row)
+	if row_gen.kind(row) == "boss" then
+		return M.ARENA_H
+	end
+	return M.CELL_H
+end
+
+-- Нижний край ряда в пространстве рядов (row 0 начинается с 0). Сумма высот рядов ниже row.
+function M.world_bottom(row)
+	assert(type(row) == "number" and row >= 0 and row == math.floor(row), "world_bottom: ряд — неотрицательное целое")
+	local p = math.floor(row / PERIOD)
+	local r = row - p * PERIOD
+	if r <= NORMAL_BAND then
+		return p * CYCLE_H + r * M.CELL_H
+	end
+	return p * CYCLE_H + NORMAL_BAND * M.CELL_H + (r - NORMAL_BAND) * M.ARENA_H
+end
+
+-- Центр ряда в пространстве рядов.
+function M.world_center(row)
+	return M.world_bottom(row) + M.row_height(row) / 2
+end
+
+-- Позиция контейнера рядов по y, при которой ряд игрока стоит у нижнего края поля.
+function M.container_y(player_row)
+	return M.MARGIN_BOTTOM - M.world_bottom(player_row)
+end
+
+-- Экранный центр ряда row при игроке на player_row.
+function M.screen_center(row, player_row)
+	return M.MARGIN_BOTTOM + (M.world_bottom(row) - M.world_bottom(player_row)) + M.row_height(row) / 2
+end
 
 -- Центр клетки колонки x по горизонтали.
 function M.cell_x(x)
 	return x * M.CELL_W + M.CELL_W / 2
 end
 
--- Центр ряда k (0 — ряд игрока, 1..VISIBLE_ROWS-1 — ряды над ним) по вертикали.
-function M.row_y(k)
-	return M.MARGIN_BOTTOM + k * M.CELL_H + M.CELL_H / 2
-end
-
--- Центр ряда row по вертикали при игроке на ряду player_row.
-function M.cell_y(row, player_row)
-	return M.row_y(row - player_row)
+-- Видимые ряды от ряда игрока вверх: ряд входит, если его нижний край начался в поле.
+-- Верхний ряд может быть виден частично (переход к высокой арене), дальше — туман войны.
+function M.visible_rows(player_row)
+	local out = {}
+	local y = player_row
+	local acc = 0
+	while acc < M.FIELD_H do
+		table.insert(out, y)
+		acc = acc + M.row_height(y)
+		y = y + 1
+	end
+	return out
 end
 
 -- Клетка под точкой (px, py) при игроке на ряду player_row.
--- Возвращает x, row или nil, если точка вне поля (по горизонтали, ниже или выше видимой области).
+-- Возвращает x, row или nil, если точка вне поля (горизонталь, ниже поля, выше поля/HUD).
 function M.cell_at(px, py, player_row)
 	if px < 0 or px >= M.WIDTH then
 		return nil
@@ -51,44 +99,17 @@ function M.cell_at(px, py, player_row)
 	if x < 0 or x >= M.COLUMNS then
 		return nil
 	end
-	local k = math.floor((py - M.MARGIN_BOTTOM) / M.CELL_H)
-	if k < 0 or k >= M.VISIBLE_ROWS then
-		return nil
+	local cur = M.MARGIN_BOTTOM
+	local y = player_row
+	while cur < M.HEIGHT - M.MARGIN_TOP do
+		local h = M.row_height(y)
+		if py < cur + h then
+			return x, y
+		end
+		cur = cur + h
+		y = y + 1
 	end
-	return x, player_row + k
-end
-
--- Режим арены: два ряда по высоте ARENA_H. k = 0 — ряд игрока (внизу), k = 1 — ряд босса.
-function M.arena_row_y(k)
-	return M.MARGIN_BOTTOM + k * M.ARENA_H + M.ARENA_H / 2
-end
-
--- Клетка арены под точкой (px, py). Возвращает x, k (0 — ряд игрока, 1 — ряд босса) или nil.
-function M.arena_cell_at(px, py)
-	if px < 0 or px >= M.WIDTH then
-		return nil
-	end
-	if py < M.MARGIN_BOTTOM or py >= M.HEIGHT - M.MARGIN_TOP then
-		return nil
-	end
-	local x = math.floor(px / M.CELL_W)
-	if x < 0 or x >= M.COLUMNS then
-		return nil
-	end
-	local k = math.floor((py - M.MARGIN_BOTTOM) / M.ARENA_H)
-	if k < 0 or k > 1 then
-		return nil
-	end
-	return x, k
-end
-
--- Смещения рядов, которые видны в обычном режиме: от ряда игрока вверх. Остальное — туман войны.
-function M.visible_offsets()
-	local out = {}
-	for k = 0, M.VISIBLE_ROWS - 1 do
-		table.insert(out, k)
-	end
-	return out
+	return nil
 end
 
 return M
