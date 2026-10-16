@@ -75,8 +75,8 @@ collections/world.collection
 
 ### 3.3 Метрики
 
-- `collections/world.script` — 1030 строк: ввод, маршрутизация режимов, отрисовка карт, чтение конфигов, HUD, лагерь, смерть, сохранения.
-- Привязки «тип карты → вид» вынесены в `scripts/view/style.lua` (символ + роли палитры); эфемерные ГО поля (обводки, пунктир, угрозы, цифры) — в `scripts/view/fx.lua`; раннер анимаций и ожидание `anim_done` — в `scripts/view/timeline.lua`; `world.script` только читает роли из `palette_cfg` и вызывает модули.
+- `collections/world.script` — 813 строк: ввод, маршрутизация режимов, вызовы `core/`, делегирование view-модулям, лагерь, смерть, сохранения.
+- Презентация вынесена в `scripts/view/`: `style.lua` (тип → символ + роли палитры), `fx.lua` (обводки, пунктир, угрозы, цифры), `timeline.lua` (раннер анимаций и `anim_done`), `board.lua` (ряды, diff-синхронизация карт, карты акторов), `hud.lua` (строки HUD). `world.script` — тонкий координатор.
 - Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском.
 
 ---
@@ -215,8 +215,10 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 - `board.card_id_at(self, x, y) -> id | nil`
 - `board.sync_cells(self, pr)` (пересылает `set` только при смене подписи)
 - `board.sync_player(self, pr)`, `board.sync_boss(self, pr)`
-- `board.lunge_offset(x0, y0, x1, y1, fraction) -> dx, dy` (чистая)
-- `board.refresh(self)` (позиция контейнера; вызывает `fx.clear`)
+- `board.lunge_offset(x0, y0, x1, y1, fraction) -> vector3` (чистая)
+- `board.refresh(self)` (позиция контейнера, diff клеток, карты акторов, `fx.clear`)
+
+Слои карт `board.Z_CELL` (0) и `board.Z_ACTOR` (0.3) экспортируются: их использует координатор при анимации хода игрока.
 
 **`scripts/view/fx.lua`** — одноразовые ГО (обводки, пунктир, угрозы, цифры):
 
@@ -276,7 +278,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 | 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | **Выполнено** (§5.7); ревью, поведение не меняется |
 | 3a | Переименование `cell.go`/`cell.script`/`cell_factory` → `card.go`/`card.script`/`card_factory` (правки в `world.go`, `world.script`, прототипе); вынос `scripts/view/fx.lua` | **Выполнено**; сборка, ручная игра |
 | 3b | Вынос `scripts/view/timeline.lua` (+ `card_anim`) | **Выполнено**; сборка, прогон боя, атак «в спину», арены |
-| 3c | Вынос `scripts/view/board.lua` (diff-синхронизация, идентичность карт, `content_row` арены) и `scripts/view/hud.lua`; `world.script` — тонкий координатор | сборка, ручная игра всех режимов |
+| 3c | Вынос `scripts/view/board.lua` (diff-синхронизация, идентичность карт, `content_row` арены) и `scripts/view/hud.lua`; `world.script` — тонкий координатор | **Выполнено**; сборка, ручная игра всех режимов |
 
 Порядок внутри 3 задан от менее связанного к более связанному (`fx` → `timeline` → `board`), чтобы не переписывать весь отлаженный таймлайн одним коммитом. `anim.lua` выносится вместе с `card.script` (3a). `cell` → `card` сделано в 3a: имя уже врёт (прототип универсальный), а ссылок мало. Палитра переходит между этапами 1 и 2: на этапе 1 `palette_cfg` переносит свойства под текущими именами (`color_*`), на этапе 2 они переименовываются в роли и подключается `style.lua` — так этап 1 не меняет картинку.
 

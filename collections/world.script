@@ -22,9 +22,11 @@ local arena = require("core.arena")
 local highlight = require("core.highlight")
 local rng = require("core.rng")
 local row_seed = require("core.row_seed")
-local style = require("scripts.view.style")
 local fx = require("scripts.view.fx")
 local timeline = require("scripts.view.timeline")
+local board = require("scripts.view.board")
+local hud = require("scripts.view.hud")
+local style = require("scripts.view.style")
 
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
@@ -33,10 +35,8 @@ local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
 -- объект молча не рисуется; больше z = ближе к камере; равный z = порядок не определён.
 -- label в card.go поднят на +0.2 внутри GO: «содержимое» клетки остаётся поверх слоя угроз.
 -- Клетки < слой угроз < персонажи < красный «вас видят» < обводки < пунктир < цифры.
--- Слои обводок/пунктира/цифр заданы в scripts/view/fx.lua.
-local Z_CELL = 0
+-- Слои обводок/пунктира/цифр — в scripts/view/fx.lua; слои карт (0, 0.3) — в scripts/view/board.lua.
 local Z_THREAT = 0.1
-local Z_ACTOR = 0.3
 local Z_SPOTTED = 0.4
 
 -- Слой z — константы кода (порядок отрисовки, не настраиваемые данные).
@@ -116,103 +116,7 @@ local function has_event(events, type_)
 	return false
 end
 
--- Клетки ряда y; ряд генерируется по seed при первом обращении и кэшируется.
-local function get_row(self, y)
-	if y < 0 then
-		return nil
-	end
-	local cells = self.rows[y]
-	if cells == nil then
-		cells = row_gen.generate(self.seed, self.world.respawn_count, y).cells
-		self.rows[y] = cells
-	end
-	return cells
-end
-
--- Источник содержимого ряда на экране: в бою ряды берутся из состояния арены,
--- остальные — из генератора (ряды типа boss без боя пусты).
-local function content_row(self, y)
-	local a = self.arena
-	if self.world.mode == MODES.BOSS and a ~= nil then
-		local pr = self.world.pos.y
-		if y == pr then
-			return a.player_row
-		end
-		if y == pr + 1 then
-			return a.boss_row
-		end
-	end
-	return get_row(self, y)
-end
-
--- Подпись содержимого клетки: меняется, когда нужно переслать "set".
-local function cell_sig(cell)
-	if cell.type == "ENEMY" then
-		return "ENEMY:" .. tostring(cell.enemy) .. ":" .. tostring(cell.hp or "")
-	end
-	return cell.type
-end
-
-local function cell_view(self, cell)
-	local view = style[cell.type] or style.EMPTY
-	local text = view.symbol
-	if cell.type == "ENEMY" then
-		local t = registry.enemies.types[cell.enemy]
-		text = t.label:sub(1, 1) .. tostring(cell.hp or t.base_hp)
-	end
-	return text, self.pal[view.fill], self.pal[view.ink]
-end
-
-local function card_msg(self, x, y, text, fill, ink)
-	local h = layout.row_height(y)
-	return { text = text, color = fill, text_color = ink,
-		width = layout.CELL_W - self.cell_gap, height = h - self.cell_gap }
-end
-
--- Клетка-карта в контейнере рядов: локальные координаты = пространство рядов.
-local function create_card(self, x, y, z)
-	local pos = vmath.vector3(layout.cell_x(x), layout.world_center(y), z)
-	local id = factory.create("#card_factory", pos)
-	if id == nil then
-		print("card create failed: label buffer full (raise [label] max_count in game.project)")
-		return nil
-	end
-	go.set_parent(id, self.rows_id, false)
-	return id
-end
-
-local function update_card(self, id, x, y, z, text, fill, ink)
-	go.set(id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), z))
-	msg.post(id, "set", card_msg(self, x, y, text, fill, ink))
-end
-
--- Эфемерные ГО (обводки, пунктир, угрозы, цифры) — в scripts/view/fx.lua.
-
--- id карты клетки (x, y) из последней синхронизации; nil — карты нет на экране.
-local function card_id_at(self, x, y)
-	local rowmap = self.cards[y]
-	local card = rowmap and rowmap[x]
-	if card == nil then
-		return nil
-	end
-	return card.id
-end
-
--- Смещение выпада: от центра клетки (x0, y0) в сторону (x1, y1), доля distance fraction.
-local function lunge_offset(x0, y0, x1, y1, fraction)
-	local dx = layout.cell_x(x1) - layout.cell_x(x0)
-	local dy = layout.world_center(y1) - layout.world_center(y0)
-	return vmath.vector3(dx * fraction, dy * fraction, 0)
-end
-
--- Мигание экрана при уроне по игроку: параметры — свойства world (gui-скрипты без property).
-local function hud_flash(self)
-	msg.post("#hud", "flash", {
-		color = self.color_flash,
-		alpha = self.flash_alpha,
-		duration = self.flash_ms / 1000,
-	})
-end
+-- Ряды, карты и акторы — в scripts/view/board.lua; эфемерные ГО — в scripts/view/fx.lua.
 
 -- Нижний ряд арены (ряд игрока): ряд типа boss с остатком периода (PERIOD - ARENA_ROWS).
 local PERIOD = balance.boss.period
@@ -222,108 +126,13 @@ local function is_arena_bottom(y)
 	return row_gen.kind(y) == "boss" and (y % PERIOD) == (PERIOD - ARENA_ROWS)
 end
 
--- Diff-синхронизация видимых клеток: создаём новые, обновляем изменившиеся,
--- удаляем вышедшие из окна. Ряды ниже игрока не видны и не хранятся как объекты.
--- Смена содержимого сбрасывает позицию карты: анимации (fall/lunge) могли её сместить.
-local function sync_cells(self, pr)
-	local new_cards = {}
-	for _, y in ipairs(layout.visible_rows(pr)) do
-		local old = self.cards[y]
-		local out = {}
-		local row = content_row(self, y)
-		for x = 0, layout.COLUMNS - 1 do
-			local cell = (row and row[x]) or { type = "EMPTY" }
-			local sig = cell_sig(cell)
-			local card = old and old[x]
-			if card == nil then
-				local id = create_card(self, x, y, Z_CELL)
-				if id ~= nil then
-					local text, fill, ink = cell_view(self, cell)
-					msg.post(id, "set", card_msg(self, x, y, text, fill, ink))
-					card = { id = id, sig = sig }
-				end
-			elseif card.sig ~= sig then
-				go.set(card.id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), Z_CELL))
-				local text, fill, ink = cell_view(self, cell)
-				msg.post(card.id, "set", card_msg(self, x, y, text, fill, ink))
-				card.sig = sig
-			end
-			out[x] = card
-		end
-		if old ~= nil then
-			for x, card in pairs(old) do
-				if out[x] == nil then
-					go.delete(card.id)
-				end
-			end
-		end
-		new_cards[y] = out
-	end
-	-- строки, вышедшие из окна: удаляем карты целиком
-	local stale = {}
-	for y in pairs(self.cards) do
-		if new_cards[y] == nil then
-			table.insert(stale, y)
-		end
-	end
-	for _, y in ipairs(stale) do
-		for _, card in pairs(self.cards[y]) do
-			go.delete(card.id)
-		end
-		self.cards[y] = nil
-	end
-	self.cards = new_cards
-end
-
--- Карта игрока: один персистентный объект, занимает клетку под собой и стоит над слоем угроз.
-local function sync_player(self, pr)
-	local pos = self.world.pos
-	if self.player_go == nil then
-		self.player_go = create_card(self, pos.x, pr, Z_ACTOR)
-	end
-	if self.player_go == nil then
-		return
-	end
-	go.set(self.player_go, "position",
-		vmath.vector3(layout.cell_x(pos.x), layout.world_center(pr), Z_ACTOR))
-	local view = style.PLAYER
-	msg.post(self.player_go, "set",
-		card_msg(self, pos.x, pr, view.symbol, self.pal[view.fill], self.pal[view.ink]))
-end
-
--- Карта босса: отдельный объект на верхнем ряду арены; создаётся в бою, удаляется по его концу.
-local function sync_boss(self, pr)
-	local a = self.arena
-	if self.world.mode ~= MODES.BOSS or a == nil then
-		if self.boss_go ~= nil then
-			go.delete(self.boss_go)
-			self.boss_go = nil
-		end
-		return
-	end
-	local boss_y = pr + 1
-	if self.boss_go == nil then
-		self.boss_go = create_card(self, a.boss_x, boss_y, Z_ACTOR)
-	end
-	if self.boss_go == nil then
-		return
-	end
-	local view = style.BOSS
-	update_card(self, self.boss_go, a.boss_x, boss_y, Z_ACTOR,
-		view.symbol .. tostring(a.boss_hp), self.pal[view.fill], self.pal[view.ink])
-end
-
--- Перерисовка: прокрутка контейнера, diff клеток, персонажи, эфемерные подсветки.
+-- Перерисовка: доска (контейнер, карты, акторы, очистка fx), затем подсветки поверх.
 local function refresh(self)
 	local pr = self.world.pos.y
-	go.set(self.rows_id, "position", vmath.vector3(0, layout.container_y(pr), 0))
-	sync_cells(self, pr)
-	sync_player(self, pr)
-	sync_boss(self, pr)
-	fx.clear(self)
+	board.refresh(self)
 	-- Слой угроз: поверх клеток, под персонажами и содержимым (GDD §5.4).
 	for _, y in ipairs(layout.visible_rows(pr)) do
-		local vision_row = highlight.vision(content_row(self, y), y)
+		local vision_row = highlight.vision(board.content_row(self, y), y)
 		local cy = layout.world_center(y)
 		local h = layout.row_height(y)
 		for x = 0, layout.COLUMNS - 1 do
@@ -342,13 +151,13 @@ local function refresh(self)
 	if self.world.mode == MODES.WORLD then
 		-- Подсветка ходов на следующий ряд (шаг, прыжок, атака по врагу).
 		local up_y = pr + 1
-		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, get_row(self, up_y))) do
+		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, board.get_row(self, up_y))) do
 			fx.outline(self, layout.cell_x(m.x), layout.world_center(up_y),
 				layout.CELL_W, layout.row_height(up_y), self.pal[OUTLINE_KEY[m.kind]])
 		end
 		-- Пунктир до каждой цели, в которую выстрел возможен.
 		local py = layout.world_center(pr)
-		for _, x in ipairs(highlight.shot_targets(self.world.pos, get_row(self, pr), self.player.weapon, reach)) do
+		for _, x in ipairs(highlight.shot_targets(self.world.pos, board.get_row(self, pr), self.player.weapon, reach)) do
 			fx.dashed(self, layout.cell_x(self.world.pos.x), py, layout.cell_x(x), py)
 		end
 	elseif self.world.mode == MODES.BOSS and self.arena ~= nil then
@@ -384,7 +193,7 @@ local function play_move(self, from_x, from_y, to_x, to_y, done)
 	go.cancel_animations(self.player_go, "position")
 	go.cancel_animations(self.rows_id, "position")
 	go.set(self.player_go, "position",
-		vmath.vector3(layout.cell_x(from_x), layout.world_center(from_y), Z_ACTOR))
+		vmath.vector3(layout.cell_x(from_x), layout.world_center(from_y), board.Z_ACTOR))
 	go.set(self.rows_id, "position", vmath.vector3(0, layout.container_y(from_y), 0))
 	local pending = 2
 	local function finish()
@@ -395,7 +204,7 @@ local function play_move(self, from_x, from_y, to_x, to_y, done)
 	end
 	msg.post(self.player_go, "lift", { duration = move_s / 2 })
 	go.animate(self.player_go, "position", go.PLAYBACK_ONCE_FORWARD,
-		vmath.vector3(layout.cell_x(to_x), layout.world_center(to_y), Z_ACTOR),
+		vmath.vector3(layout.cell_x(to_x), layout.world_center(to_y), board.Z_ACTOR),
 		go.EASING_INOUTQUAD, move_s, 0, finish)
 	go.animate(self.rows_id, "position", go.PLAYBACK_ONCE_FORWARD,
 		vmath.vector3(0, layout.container_y(to_y), 0),
@@ -439,20 +248,20 @@ local function steps_step(self, from_x, from_y, events)
 	if #behinds > 0 then
 		-- Несколько врагов бьют «в спину» последовательно: выпад, цифра, вспышка — на каждого.
 		for i, e in ipairs(behinds) do
-			table.insert(steps, timeline.card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
-				offset = lunge_offset(e.enemy_x, from_y, from_x, from_y, 0.6),
+			table.insert(steps, timeline.card_anim(self, board.card_id_at(self, e.enemy_x, from_y), "lunge", {
+				offset = board.lunge_offset(e.enemy_x, from_y, from_x, from_y, 0.6),
 			}))
 			local dx = (i - 1) * self.popup_spread - self.popup_spread / 2
 			table.insert(steps, function(next)
 				fx.popup(self, from_x, from_y, "-" .. e.damage, "damage", dx)
-				hud_flash(self)
+				hud.flash(self)
 				next()
 			end)
 		end
 	end
 	if died then
 		table.insert(steps, function(next)
-			hud_flash(self)
+			hud.flash(self)
 			next()
 		end)
 		table.insert(steps, timeline.card_anim(self, self.player_go, "fall", {
@@ -496,15 +305,15 @@ local function steps_melee(self, from_x, from_y, tx, ty, events)
 		return steps
 	end
 	local player_card = self.player_go
-	local enemy_card = card_id_at(self, tx, ty)
+	local enemy_card = board.card_id_at(self, tx, ty)
 	table.insert(steps, timeline.card_anim(self, player_card, "lunge", {
-		offset = lunge_offset(from_x, from_y, tx, ty, 0.6),
+		offset = board.lunge_offset(from_x, from_y, tx, ty, 0.6),
 	}))
 	table.insert(steps, function(next)
 		-- Отскок завершён: цифры урона, мигание экрана (урон по игроку), поверженный враг падает.
 		fx.popup(self, tx, ty, "-" .. poke.dealt_to_enemy, "damage", 0)
 		fx.popup(self, from_x, from_y, "-" .. poke.dealt_to_player, "damage", self.popup_spread)
-		hud_flash(self)
+		hud.flash(self)
 		if dead ~= nil then
 			if enemy_card ~= nil then
 				fall_message(self, enemy_card, ty)
@@ -535,7 +344,7 @@ local function steps_shoot(self, x, events)
 		return steps
 	end
 	local y = self.world.pos.y
-	local id = card_id_at(self, x, y)
+	local id = board.card_id_at(self, x, y)
 	table.insert(steps, function(next)
 		fx.popup(self, x, y, "-" .. shot.damage, "damage", 0)
 		next()
@@ -568,7 +377,7 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 	end
 	if pattack ~= nil then
 		table.insert(steps, timeline.card_anim(self, self.player_go, "lunge", {
-			offset = lunge_offset(mid_x, from_y, boss_from_x, from_y + 1, 0.55),
+			offset = board.lunge_offset(mid_x, from_y, boss_from_x, from_y + 1, 0.55),
 		}))
 		table.insert(steps, function(next)
 			fx.popup(self, boss_from_x, from_y + 1, "-" .. pattack.damage, "damage", 0)
@@ -591,16 +400,16 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 					return
 				end
 				go.animate(id, "position", go.PLAYBACK_ONCE_FORWARD,
-					vmath.vector3(layout.cell_x(boss_to_x), layout.world_center(from_y + 1), Z_ACTOR),
+					vmath.vector3(layout.cell_x(boss_to_x), layout.world_center(from_y + 1), board.Z_ACTOR),
 					go.EASING_INOUTQUAD, self.move_ms / 1000, 0, next)
 			end)
 		end
 		table.insert(steps, timeline.card_anim(self, self.boss_go, "lunge", {
-			offset = lunge_offset(boss_to_x, from_y + 1, mid_x, from_y, 0.55),
+			offset = board.lunge_offset(boss_to_x, from_y + 1, mid_x, from_y, 0.55),
 		}))
 		table.insert(steps, function(next)
 			fx.popup(self, mid_x, from_y, "-" .. battack.damage, "damage", 0)
-			hud_flash(self)
+			hud.flash(self)
 			if outcome == "defeat" then
 				table.insert(steps, timeline.card_anim(self, self.player_go, "fall", {
 					offset = vmath.vector3(0, -layout.row_height(from_y) * self.fall_drop, 0),
@@ -631,35 +440,9 @@ local function steps_arena_shot(self, boss_x, row, shot, won, win_target)
 	return steps
 end
 
--- Текст HUD и кнопки внизу экрана.
-local function sync_hud(self)
-	local p = self.player
-	local pos = self.world.pos
-	local top = string.format("ROW %d   HP %d/%d   CHARGES %d/%d   GOLD %d",
-		pos.y, p.hp, p.max_hp, p.weapon.charges, p.weapon.max_charges, p.gold)
-	if self.camp_state.pay_turns_left > 0 then
-		top = top .. string.format("   CAMP FEE: %d TURNS", self.camp_state.pay_turns_left)
-	end
-	local bottom
-	if self.world.mode == MODES.CAMP then
-		bottom = "LEAVE CAMP"
-	elseif self.world.mode == MODES.WORLD then
-		bottom = string.format("MAKE CAMP (%d gold)", camp.install_price(p.gold))
-	elseif self.world.mode == MODES.BOSS and self.arena then
-		bottom = string.format("BOSS HP %d/%d", self.arena.boss_hp, self.arena.boss_max)
-	else
-		bottom = ""
-	end
-	msg.post("#hud", "update", {
-		top = top,
-		bottom = bottom,
-		overlay = self.world.mode == MODES.DEATH,
-	})
-end
-
 -- Синхронизация экрана по завершении таймлайна.
 local function finish_view(self)
-	sync_hud(self)
+	hud.sync(self)
 	refresh(self)
 end
 
@@ -667,7 +450,7 @@ end
 local function return_point_for_save(self)
 	local rp = self.world.return_point
 	local out = { kind = rp.kind, row = rp.row, x = rp.x }
-	local cells = get_row(self, rp.row)
+	local cells = board.get_row(self, rp.row)
 	out.cells = {}
 	for x = 0, layout.COLUMNS - 1 do
 		out.cells[x + 1] = (cells[x] or { type = "EMPTY" }).type
@@ -723,7 +506,7 @@ end
 
 local function make_camp(self)
 	local pos = self.world.pos
-	local cells = get_row(self, pos.y)
+	local cells = board.get_row(self, pos.y)
 	local res, reason = camp.install(self.camp_state, self.player.gold, cells)
 	if res == nil then
 		print(reason)
@@ -745,7 +528,7 @@ local function leave_camp(self)
 	camp.exit(self.camp_state)
 	world.transition(self.world, MODES.WORLD)
 	save(self)
-	sync_hud(self)
+	hud.sync(self)
 end
 
 -- Вход на арену: создаётся состояние боя, ряды арены генерируются по seed этого ряда.
@@ -955,7 +738,7 @@ function init(self)
 		world = self.world,
 		player = self.player,
 		get_row = function(y)
-			return get_row(self, y)
+			return board.get_row(self, y)
 		end,
 	}
 	if not found then
@@ -1018,7 +801,7 @@ function on_input(self, action_id, action)
 	if mode ~= MODES.WORLD then
 		return true
 	end
-	local target = (get_row(self, row) or {})[x]
+	local target = (board.get_row(self, row) or {})[x]
 	if row == self.world.pos.y + 1 and target and target.type == "ENEMY" then
 		world_action(self, "melee", x, row)
 	elseif row == self.world.pos.y + 1 then

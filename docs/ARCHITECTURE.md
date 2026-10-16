@@ -64,11 +64,13 @@ DCA/
 │   └── view/
 │       ├── style.lua            view-registry: тип карты -> символ + роли палитры
 │       ├── fx.lua               эфемерные ГО: обводки, пунктир, угрозы, цифры
-│       └── timeline.lua         раннер анимаций и ожидание anim_done
+│       ├── timeline.lua         раннер анимаций и ожидание anim_done
+│       ├── board.lua            ряды, diff-синхронизация карт, карты акторов
+│       └── hud.lua              строки HUD и сообщения в hud.gui
 ├── input/game.input_binding     привязки ввода (touch)
 ├── collections/
 │   ├── world.collection         точка входа: мир, HUD, контейнер рядов
-│   └── world.script             координатор: ввод, режимы, вызовы core, таймлайн
+│   └── world.script             координатор: ввод, режимы, вызовы core, делегирование view-модулям
 ├── game_objects/
 │   ├── world.go                 объект мира (world.script + config-компоненты)
 │   ├── geom_cfg.script          конфиг геометрии (go.property)
