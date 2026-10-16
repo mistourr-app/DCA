@@ -60,7 +60,9 @@ DCA/
 │       ├── bosses.lua
 │       └── row_kinds.lua
 ├── scripts/                     Defold-хелперы без игровой логики
-│   └── saves.lua                sys.save / sys.load, путь, версия
+│   ├── saves.lua                sys.save / sys.load, путь, версия
+│   └── view/
+│       └── style.lua            view-registry: тип карты -> символ + роли палитры
 ├── input/game.input_binding     привязки ввода (touch)
 ├── collections/
 │   ├── world.collection         точка входа: мир, HUD, контейнер рядов

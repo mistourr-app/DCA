@@ -45,7 +45,7 @@ collections/world.collection
 │     ├── geom_cfg        → game_objects/geom_cfg.script
 │     ├── anim_cfg        → game_objects/anim_cfg.script
 │     ├── flash_cfg       → game_objects/flash_cfg.script
-│     ├── palette_cfg     → game_objects/palette_cfg.script
+│     ├── palette_cfg     → game_objects/palette_cfg.script  (16 ролевых цветов)
 │     ├── cell_factory    → game_objects/cell.go        (5 go.property в cell.script)
 │     ├── bar_factory     → game_objects/bar.go
 │     ├── popup_factory   → game_objects/popup.go        (5 go.property в popup.script)
@@ -66,7 +66,7 @@ collections/world.collection
 | `game_objects/geom_cfg.script` | 4 | `cell_gap`, `border_width`, `dash_step`, `dash_size` |
 | `game_objects/anim_cfg.script` | 4 | `move_ms`, `fall_drop`, `popup_spread`, `popup_y_factor` |
 | `game_objects/flash_cfg.script` | 3 | `color_flash`, `flash_alpha`, `flash_ms` |
-| `game_objects/palette_cfg.script` | 22 | палитра: фон/подпись 8 типов, обводки/пунктир/угрозы (имена `color_*`; этап 2 — роли) |
+| `game_objects/palette_cfg.script` | 16 | роль-палитра: `fill_neutral`/`fill_wall`/`fill_good`/`fill_gold`/`fill_danger`/`fill_attack`/`fill_camp`/`fill_player`, `ink_dark`/`ink_light`, `outline_step`/`outline_jump`/`outline_attack`, `dot`/`vision`/`spotted` |
 | `game_objects/cell.script` | 5 | `lift_scale`, `lunge_ms`, `fall_ms`, `flash_ms`, `flash_color` |
 | `game_objects/popup.script` | 5 | `float_ms`, `float_rise`, `color_damage`, `color_heal`, `color_gold` |
 | `gui/hud.gui_script` | 0 | невозможно; параметры вспышки приходят сообщением `flash` |
@@ -75,8 +75,8 @@ collections/world.collection
 
 ### 3.3 Метрики
 
-- `collections/world.script` — 1141 строка: ввод, маршрутизация режимов, раннер таймлайна, отрисовка (карты/обводки/пунктир/угрозы/цифры), чтение конфигов, HUD, лагерь, смерть, сохранения.
-- Привязки типов зашиты в `world.script`: `SYMBOL`, `FILL_KEY`, `INK_KEY`, `PLAYER_TEXT`.
+- `collections/world.script` — 1121 строка: ввод, маршрутизация режимов, раннер таймлайна, отрисовка (карты/обводки/пунктир/угрозы/цифры), чтение конфигов, HUD, лагерь, смерть, сохранения.
+- Привязки «тип карты → вид» вынесены в `scripts/view/style.lua` (символ + роли палитры); `world.script` только читает роли из `palette_cfg`.
 - Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском.
 
 ---
@@ -88,17 +88,17 @@ collections/world.collection
 Снято этапами из §7:
 
 - _(этап 1)_ Плоский список 34 свойств на компоненте `world` → свойства разнесены по `geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg` (§3.2).
+- _(этап 2)_ Палитра «на каждый тип» (16 цветов fill/ink) → роль-палитра из 8 фонов + 2 чернил (§5.4); «тип → вид» вынесен в `scripts/view/style.lua`.
 
 Осталось:
 
 1. **Монолит `world.script`.** Логика координатора, отрисовки и данных в одном файле. При росте типов сущностей и механик файл превратится в спагетти.
 2. **Привязки типов зашиты в мировой скрипт.** Новый тип клетки/врага/объекта требует правки `world.script` — нарушает принцип реестра (`docs/ENTITY_REGISTRY.md` §1.3): новая сущность не должна трогать ядро или игровой цикл.
-3. **Палитра «на каждый тип»** (16 цветов fill/ink) растёт линейно с числом типов. При этом сейчас все враги и так одного цвета (различаются буквой и числом HP).
 
 Потенциальные (при росте):
 
-4. **Дублирование анимаций.** Если появятся сущности с иной формой (босс-мультиклетка, ловушка, сундук), логика lift/lunge/fall/flash может размножиться по скриптам.
-5. **Doc drift.** Дисциплина: при изменении структуры сначала правки в `docs/ARCHITECTURE.md` §2, затем код. Ранее документация описывала `main/`, `camp.collection`, `player/enemy/boss.go` — карта приведена к факту (фаза 1, §8).
+3. **Дублирование анимаций.** Если появятся сущности с иной формой (босс-мультиклетка, ловушка, сундук), логика lift/lunge/fall/flash может размножиться по скриптам.
+4. **Doc drift.** Дисциплина: при изменении структуры сначала правки в `docs/ARCHITECTURE.md` §2, затем код. Ранее документация описывала `main/`, `camp.collection`, `player/enemy/boss.go` — карта приведена к факту (фаза 1, §8).
 
 ### 4.2 Ограничения движка (данность, не проблемы)
 
@@ -145,7 +145,7 @@ game_objects/              прототипы и скрипты
 | `flash_cfg` | `color_flash`, `flash_alpha`, `flash_ms` |
 | `palette_cfg` | роль-палитра: `fill_neutral`, `fill_wall`, `fill_good`, `fill_gold`, `fill_danger`, `fill_attack`, `fill_camp`, `fill_player`, `ink_dark`, `ink_light`, цвета обводок/пунктира/угроз |
 
-Имена в `palette_cfg` — цель этапа 2 (§7): на этапе 1 свойства переносятся под текущими именами (`color_wall_fill` и т.п.). `debug_seed` остаётся единственным `go.property` на самом `world.script` — это параметр мира, а не конфиг анимации или отрисовки.
+Имена в `palette_cfg` — роли (§5.4): на этапе 1 свойства переносились под временными именами `color_*`, на этапе 2 заменены ролями, а связь «тип → роли» вынесена в `scripts/view/style.lua`. `debug_seed` остаётся единственным `go.property` на самом `world.script` — это параметр мира, а не конфиг анимации или отрисовки.
 
 `world.script` читает конфиги обычным `go.get("#geom_cfg", "cell_gap")`: значения `go.property` — константы сборки и от `init` владельца не зависят (§4.2), поэтому ленивое чтение не требуется. Схема с sibling-компонентами выбрана по локальности и числу сущностей; отдельный объект `config` в коллекции отклонён — меньше локальности.
 
@@ -156,8 +156,7 @@ game_objects/              прототипы и скрипты
 Все сущности поля (клетки, враги, игрок, босс, будущие объекты) рисуются одним `card.go`. Различия — только данные в `scripts/view/style.lua`:
 
 ```lua
--- scripts/view/style.lua (пример, не финальный)
-local M = {}
+-- scripts/view/style.lua (фрагмент)
 M.EMPTY       = { symbol = "",  fill = "fill_neutral", ink = "ink_dark" }
 M.WALL        = { symbol = "#", fill = "fill_wall",    ink = "ink_light" }
 M.HEAL        = { symbol = "+", fill = "fill_good",    ink = "ink_dark" }
@@ -166,7 +165,7 @@ M.ENEMY       = { symbol = "E", fill = "fill_danger",  ink = "ink_light" }
 M.ATTACK_CELL = { symbol = "A", fill = "fill_attack",  ink = "ink_light" }
 M.CAMP        = { symbol = "C", fill = "fill_camp",    ink = "ink_dark" }
 M.PLAYER      = { symbol = "@", fill = "fill_player",  ink = "ink_dark" }
-return M
+M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 ```
 
 Буква врага конкретного типа (`A`/`S`/`W`) и его HP берутся из записи `core/registry/enemies`. `world.script` и `card.script` при этом **не меняются**.
@@ -216,7 +215,7 @@ return M
 |---|---|---|
 | 0 | Синхронизация документации под текущий факт | **Выполнено** (фаза 1: `ARCHITECTURE`, `AI_CODING_RULES`, `BALANCE`, `TESTING`, `ENGINE_DEFOLD`, `CONVENTIONS`, `PLAN`; `PLAN_14` удалён) |
 | 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка полноты палитры при старте | **Выполнено**; сборка 1.14.0, лог без ERROR, ручная игра |
-| 2 | Роль-палитра + `scripts/view/style.lua`; снятие `SYMBOL`/`FILL_KEY`/`INK_KEY` из `world.script`; проверка style → palette (§5.6) | сборка, ручная сверка вида клеток/врагов/игрока |
+| 2 | Роль-палитра + `scripts/view/style.lua`; снятие `SYMBOL`/`FILL_KEY`/`INK_KEY` из `world.script`; проверка style → palette (§5.6) | **Выполнено**; сборка, ручная сверка вида клеток/врагов/игрока |
 | 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | ревью, поведение не меняется |
 | 3a | Переименование `cell.go`/`cell.script` → `card.go`/`card.script` (правки ссылок в фабрике, `world.go`, `world.script`); вынос `scripts/view/fx.lua` | сборка, ручная игра |
 | 3b | Вынос `scripts/view/timeline.lua` (+ `card_anim`) | сборка, прогон боя, атак «в спину», арены |

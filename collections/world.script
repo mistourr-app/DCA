@@ -22,6 +22,7 @@ local arena = require("core.arena")
 local highlight = require("core.highlight")
 local rng = require("core.rng")
 local row_seed = require("core.row_seed")
+local style = require("scripts.view.style")
 
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
@@ -52,39 +53,18 @@ local ANIM_CFG = "#anim_cfg"
 local FLASH_CFG = "#flash_cfg"
 local PALETTE_CFG = "#palette_cfg"
 
--- Ключи палитры в palette_cfg (этап 1 — имена color_*; этап 2 заменит их ролями).
+-- Роли палитры в palette_cfg (docs/DEFOLD_INTEGRATION.md §5.2, §5.4).
 local PALETTE_KEYS = {
-	"color_empty_fill", "color_empty_ink",
-	"color_wall_fill", "color_wall_ink",
-	"color_heal_fill", "color_heal_ink",
-	"color_gold_fill", "color_gold_ink",
-	"color_enemy_fill", "color_enemy_ink",
-	"color_camp_fill", "color_camp_ink",
-	"color_attack_fill", "color_attack_ink",
-	"color_player_fill", "color_player_ink",
-	"color_outline_step", "color_outline_jump", "color_outline_attack",
-	"color_dot", "color_vision", "color_spotted",
+	"fill_neutral", "fill_wall", "fill_good", "fill_gold",
+	"fill_danger", "fill_attack", "fill_camp", "fill_player",
+	"ink_dark", "ink_light",
+	"outline_step", "outline_jump", "outline_attack",
+	"dot", "vision", "spotted",
 }
 
--- Символы типов карт (текст — не число, остаётся в коде).
-local SYMBOL = {
-	EMPTY = "", WALL = "#", HEAL = "+", GOLD = "$",
-	ENEMY = "E", CAMP = "C", ATTACK_CELL = "A",
-}
-local PLAYER_TEXT = "@"
--- Тип карты -> имена property фона и подписи.
-local FILL_KEY = {
-	EMPTY = "color_empty_fill", WALL = "color_wall_fill", HEAL = "color_heal_fill",
-	GOLD = "color_gold_fill", ENEMY = "color_enemy_fill", CAMP = "color_camp_fill",
-	ATTACK_CELL = "color_attack_fill",
-}
-local INK_KEY = {
-	EMPTY = "color_empty_ink", WALL = "color_wall_ink", HEAL = "color_heal_ink",
-	GOLD = "color_gold_ink", ENEMY = "color_enemy_ink", CAMP = "color_camp_ink",
-	ATTACK_CELL = "color_attack_ink",
-}
+-- Вид хода -> роль палитры для обводки.
 local OUTLINE_KEY = {
-	step = "color_outline_step", jump = "color_outline_jump", attack = "color_outline_attack",
+	step = "outline_step", jump = "outline_jump", attack = "outline_attack",
 }
 
 -- Чтение config-компонентов один раз при старте. Значения go.property — константы сборки,
@@ -107,25 +87,24 @@ local function read_config(self)
 	end
 end
 
--- Проверка связей вид -> палитра при старте: пропущенная роль дала бы тихий nil и падение в бою.
+-- Проверка связей style -> palette при старте (§5.6): неизвестная роль дала бы
+-- тихий nil и падение в бою. Обязательная проверка; ненайденная роль — остановка.
 local function check_palette(self)
 	local function need(desc, key)
 		if self.pal[key] == nil then
 			error("palette_cfg: нет свойства " .. key .. " для " .. desc)
 		end
 	end
-	for _, key in pairs(FILL_KEY) do
-		need("fill", key)
-	end
-	for _, key in pairs(INK_KEY) do
-		need("ink", key)
+	for type_, view in pairs(style) do
+		need("fill " .. type_, view.fill)
+		need("ink " .. type_, view.ink)
 	end
 	for _, key in pairs(OUTLINE_KEY) do
 		need("outline", key)
 	end
-	need("dot", "color_dot")
-	need("vision", "color_vision")
-	need("spotted", "color_spotted")
+	need("dot", "dot")
+	need("vision", "vision")
+	need("spotted", "spotted")
 end
 
 local function has_event(events, type_)
@@ -175,14 +154,13 @@ local function cell_sig(cell)
 end
 
 local function cell_view(self, cell)
-	local text = SYMBOL[cell.type] or SYMBOL.EMPTY
+	local view = style[cell.type] or style.EMPTY
+	local text = view.symbol
 	if cell.type == "ENEMY" then
 		local t = registry.enemies.types[cell.enemy]
 		text = t.label:sub(1, 1) .. tostring(cell.hp or t.base_hp)
 	end
-	local fill = self.pal[FILL_KEY[cell.type] or FILL_KEY.EMPTY]
-	local ink = self.pal[INK_KEY[cell.type] or INK_KEY.EMPTY]
-	return text, fill, ink
+	return text, self.pal[view.fill], self.pal[view.ink]
 end
 
 local function card_msg(self, x, y, text, fill, ink)
@@ -235,7 +213,7 @@ end
 -- Тонкая пунктирная линия от точки (ax, ay) до (bx, by), верхний слой. Пространство рядов.
 local function draw_dashed(self, ax, ay, bx, by)
 	for _, p in ipairs(highlight.dash_points(ax, ay, bx, by, self.dash_step)) do
-		spawn_bar(self, p.x, p.y, self.dash_size, self.dash_size, self.pal.color_dot, Z_DASH)
+		spawn_bar(self, p.x, p.y, self.dash_size, self.dash_size, self.pal.dot, Z_DASH)
 	end
 end
 
@@ -357,8 +335,9 @@ local function sync_player(self, pr)
 	end
 	go.set(self.player_go, "position",
 		vmath.vector3(layout.cell_x(pos.x), layout.world_center(pr), Z_ACTOR))
+	local view = style.PLAYER
 	msg.post(self.player_go, "set",
-		card_msg(self, pos.x, pr, PLAYER_TEXT, self.pal.color_player_fill, self.pal.color_player_ink))
+		card_msg(self, pos.x, pr, view.symbol, self.pal[view.fill], self.pal[view.ink]))
 end
 
 -- Карта босса: отдельный объект на верхнем ряду арены; создаётся в бою, удаляется по его концу.
@@ -378,8 +357,9 @@ local function sync_boss(self, pr)
 	if self.boss_go == nil then
 		return
 	end
+	local view = style.BOSS
 	update_card(self, self.boss_go, a.boss_x, boss_y, Z_ACTOR,
-		"B" .. tostring(a.boss_hp), self.pal.color_enemy_fill, self.pal.color_enemy_ink)
+		view.symbol .. tostring(a.boss_hp), self.pal[view.fill], self.pal[view.ink])
 end
 
 -- Перерисовка: прокрутка контейнера, diff клеток, персонажи, эфемерные подсветки.
@@ -403,9 +383,9 @@ local function refresh(self)
 			if alpha ~= nil then
 				if y == pr and x == self.world.pos.x and self.world.mode == MODES.WORLD then
 					-- Игрок в поле зрения: его клетка красная, поверх спрайта персонажа, под надписью.
-					draw_threat(self, layout.cell_x(x), cy, h, self.pal.color_spotted, alpha, Z_SPOTTED)
+					draw_threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED)
 				else
-					draw_threat(self, layout.cell_x(x), cy, h, self.pal.color_vision, alpha, Z_THREAT)
+					draw_threat(self, layout.cell_x(x), cy, h, self.pal.vision, alpha, Z_THREAT)
 				end
 			end
 		end
