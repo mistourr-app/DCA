@@ -1,0 +1,2 @@
+prototype: "/game_objects/card.go"
+load_dynamically: 0

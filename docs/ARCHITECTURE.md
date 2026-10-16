@@ -62,7 +62,8 @@ DCA/
 ├── scripts/                     Defold-хелперы без игровой логики
 │   ├── saves.lua                sys.save / sys.load, путь, версия
 │   └── view/
-│       └── style.lua            view-registry: тип карты -> символ + роли палитры
+│       ├── style.lua            view-registry: тип карты -> символ + роли палитры
+│       └── fx.lua               эфемерные ГО: обводки, пунктир, угрозы, цифры
 ├── input/game.input_binding     привязки ввода (touch)
 ├── collections/
 │   ├── world.collection         точка входа: мир, HUD, контейнер рядов
@@ -73,8 +74,8 @@ DCA/
 │   ├── anim_cfg.script          конфиг анимаций поля
 │   ├── flash_cfg.script         конфиг вспышки HUD
 │   ├── palette_cfg.script       конфиг палитры
-│   ├── cell.go/.script          универсальная карта поля (спрайт + label + анимации)
-│   ├── cell_factory.factory     фабрика карт
+│   ├── card.go/.script          универсальная карта поля (спрайт + label + анимации)
+│   ├── card_factory.factory     фабрика карт
 │   ├── cell_sprite.sprite, cell_label.label
 │   ├── bar.go/.script           обводки и слой угроз (полупрозрачные прямоугольники)
 │   ├── bar_factory.factory
@@ -186,8 +187,8 @@ world.script         проигрывает события: анимации, т
 - `world.collection` — контейнер рядов (`rows`), `world` (несёт `world.script`), `hud` (GUI-компонент).
 - Лагерь и смерть — GUI-состояния поверх мира (`hud.gui`). Мир не выгружается.
 - Босс: объекты арены создаются при входе в режим `BOSS` и удаляются при выходе.
-- Фабрики: карты (`cell_factory`), обводок/угроз (`bar_factory`), цифр (`popup_factory`).
-- Одна карта — один прототип `cell.go`, вид задаётся данными (тип → вид), см. `docs/DEFOLD_INTEGRATION.md`.
+- Фабрики: карты (`card_factory`), обводок/угроз (`bar_factory`), цифр (`popup_factory`).
+- Одна карта — один прототип `card.go`, вид задаётся данными (тип → вид), см. `docs/DEFOLD_INTEGRATION.md`.
 - Имена объектов стабильны и не полагаются на автогенерацию.
 
 ---

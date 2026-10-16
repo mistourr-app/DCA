@@ -19,8 +19,8 @@ components {
   component: "/game_objects/palette_cfg.script"
 }
 components {
-  id: "cell_factory"
-  component: "/game_objects/cell_factory.factory"
+  id: "card_factory"
+  component: "/game_objects/card_factory.factory"
 }
 components {
   id: "bar_factory"

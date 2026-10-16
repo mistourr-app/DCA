@@ -81,7 +81,7 @@ collections, game_objects, gui   ──▶  scripts/  ──▶  core/  ──�
 - Отмена: `go.cancel_animations(url, property)` до запуска новой анимации на то же свойство.
 - Задержки: `timer.delay(delay, repeat, callback)`, при `final` отменять через `timer.cancel`.
 - Ход игры не должен зависеть от длительности анимации. Логика выполняется сразу, анимация только показывает результат. Если логике нужно дождаться анимации, использовать явную очередь состояний, а не `timer.delay` с магическим временем.
-- Длительности и параметры анимаций — `go.property` скрипта, который их проигрывает (`world.script` — `move_ms`, `cell.script` — `lunge_ms`/`fall_ms`/`flash_ms`/`lift_scale`, `popup.script` — цифры, `hud.gui_script` — вспышка). В `balance.csv` их быть не может: это не геймплей. Числа, которые читает `core/`, — в `design/design.csv`.
+- Длительности и параметры анимаций — `go.property` скрипта, который их проигрывает (`anim_cfg.script` — `move_ms`, `card.script` — `lunge_ms`/`fall_ms`/`flash_ms`/`lift_scale`, `popup.script` — цифры, `hud.gui_script` — вспышка). В `balance.csv` их быть не может: это не геймплей. Числа, которые читает `core/`, — в `design/design.csv`.
 
 ---
 
@@ -139,8 +139,8 @@ collections, game_objects, gui   ──▶  scripts/  ──▶  core/  ──�
 | Тип врага (ключ) | `TYPE_N` (как в DR) | `TYPE_1` |
 | Лейблы для игрока | UPPER_CASE, из balance | `ARCANIST` |
 | Сообщения | snake_case строка в hash | `hash("cell_clicked")` |
-| Коллекции и объекты Defold | snake_case | `world.collection`, `cell.go` |
-| ID объектов в коллекции | snake_case | `world`, `rows`, `cell_3_4` |
+| Коллекции и объекты Defold | snake_case | `world.collection`, `card.go` |
+| ID объектов в коллекции | snake_case | `world`, `rows`, `card_3_4` |
 
 Координаты: `x` — колонка (0..4), `y` — ряд (0 — нижний). Всегда в этом порядке, всегда `x, y` (не `row, col`).
 
@@ -154,7 +154,7 @@ collections, game_objects, gui   ──▶  scripts/  ──▶  core/  ──�
 |---|---|---|
 | Правила игры: HP, урон, шансы, цены, кривые, период боссов | `balance/balance.csv` → `core/data/balance.lua` | текстовый редактор / таблицы; код читает только generated-файл |
 | Числа, которые читает `core/` (геометрия `screen.*`, `screen.threatAlpha`) | `design/design.csv` → `core/data/design.lua` | то же. Причина: `core/` не видит Defold и `go.property` |
-| Экран: длительности анимаций, палитра, размеры обводок/пунктира, разброс цифр | `go.property` скрипта экрана (`world.script`, `cell.script`, `popup.script`, `hud.gui_script`) | инспектор Defold (значение пишется в `.go`/`.collection`/`.gui`) или тот же файл руками |
+| Экран: длительности анимаций, палитра, размеры обводок/пунктира, разброс цифр | `go.property` скрипта экрана (`anim_cfg.script`, `geom_cfg.script`, `palette_cfg.script`, `card.script`, `popup.script`) | инспектор Defold (значение пишется в `.go`/`.collection`/`.gui`) или тот же файл руками |
 
 - Сгенерированные файлы не редактировать руками. Изменение баланса: править CSV → `python tools/build_balance.py` → `lua tests/run.lua`.
 - Новый параметр добавляется сначала в источник (CSV или объявление property), потом в код. Код не читает параметр, которого нет в источнике.

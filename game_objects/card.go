@@ -12,6 +12,6 @@ components {
   }
 }
 components {
-  id: "cell"
-  component: "/game_objects/cell.script"
+  id: "card"
+  component: "/game_objects/card.script"
 }

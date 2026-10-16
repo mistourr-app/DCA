@@ -46,7 +46,7 @@ collections/world.collection
 │     ├── anim_cfg        → game_objects/anim_cfg.script
 │     ├── flash_cfg       → game_objects/flash_cfg.script
 │     ├── palette_cfg     → game_objects/palette_cfg.script  (16 ролевых цветов)
-│     ├── cell_factory    → game_objects/cell.go        (5 go.property в cell.script)
+│     ├── card_factory    → game_objects/card.go        (5 go.property в card.script)
 │     ├── bar_factory     → game_objects/bar.go
 │     ├── popup_factory   → game_objects/popup.go        (5 go.property в popup.script)
 │     └── hud             → gui/hud.gui                  (go.property нет)
@@ -54,7 +54,7 @@ collections/world.collection
       └── script          → game_objects/rows.script     (пустой контейнер)
 ```
 
-- Игрок и босс рисуются **тем же прототипом** `cell.go` (создаются фабрикой `cell_factory`). Отдельных `player.go`, `enemy.go`, `boss.go` нет.
+- Игрок и босс рисуются **тем же прототипом** `card.go` (создаются фабрикой `card_factory`). Отдельных `player.go`, `enemy.go`, `boss.go` нет.
 - `rows.go` — контейнер, родитель всех карт, обводок и цифр; позицию задаёт `world.script` (прокрутка).
 - Лагерь и смерть — не отдельные коллекции/GUI, а экранные состояния внутри `world.script` + `hud.gui` (оверлей).
 
@@ -67,7 +67,7 @@ collections/world.collection
 | `game_objects/anim_cfg.script` | 4 | `move_ms`, `fall_drop`, `popup_spread`, `popup_y_factor` |
 | `game_objects/flash_cfg.script` | 3 | `color_flash`, `flash_alpha`, `flash_ms` |
 | `game_objects/palette_cfg.script` | 16 | роль-палитра: `fill_neutral`/`fill_wall`/`fill_good`/`fill_gold`/`fill_danger`/`fill_attack`/`fill_camp`/`fill_player`, `ink_dark`/`ink_light`, `outline_step`/`outline_jump`/`outline_attack`, `dot`/`vision`/`spotted` |
-| `game_objects/cell.script` | 5 | `lift_scale`, `lunge_ms`, `fall_ms`, `flash_ms`, `flash_color` |
+| `game_objects/card.script` | 5 | `lift_scale`, `lunge_ms`, `fall_ms`, `flash_ms`, `flash_color` |
 | `game_objects/popup.script` | 5 | `float_ms`, `float_rise`, `color_damage`, `color_heal`, `color_gold` |
 | `gui/hud.gui_script` | 0 | невозможно; параметры вспышки приходят сообщением `flash` |
 
@@ -75,8 +75,8 @@ collections/world.collection
 
 ### 3.3 Метрики
 
-- `collections/world.script` — 1121 строка: ввод, маршрутизация режимов, раннер таймлайна, отрисовка (карты/обводки/пунктир/угрозы/цифры), чтение конфигов, HUD, лагерь, смерть, сохранения.
-- Привязки «тип карты → вид» вынесены в `scripts/view/style.lua` (символ + роли палитры); `world.script` только читает роли из `palette_cfg`.
+- `collections/world.script` — 1068 строк: ввод, маршрутизация режимов, раннер таймлайна, отрисовка карт, чтение конфигов, HUD, лагерь, смерть, сохранения.
+- Привязки «тип карты → вид» вынесены в `scripts/view/style.lua` (символ + роли палитры); эфемерные ГО поля (обводки, пунктир, угрозы, цифры) — в `scripts/view/fx.lua`; `world.script` только читает роли из `palette_cfg` и вызывает модули.
 - Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском.
 
 ---
@@ -274,7 +274,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 | 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка полноты палитры при старте | **Выполнено**; сборка 1.14.0, лог без ERROR, ручная игра |
 | 2 | Роль-палитра + `scripts/view/style.lua`; снятие `SYMBOL`/`FILL_KEY`/`INK_KEY` из `world.script`; проверка style → palette (§5.6) | **Выполнено**; сборка, ручная сверка вида клеток/врагов/игрока |
 | 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | **Выполнено** (§5.7); ревью, поведение не меняется |
-| 3a | Переименование `cell.go`/`cell.script` → `card.go`/`card.script` (правки ссылок в фабрике, `world.go`, `world.script`); вынос `scripts/view/fx.lua` | сборка, ручная игра |
+| 3a | Переименование `cell.go`/`cell.script`/`cell_factory` → `card.go`/`card.script`/`card_factory` (правки в `world.go`, `world.script`, прототипе); вынос `scripts/view/fx.lua` | **Выполнено**; сборка, ручная игра |
 | 3b | Вынос `scripts/view/timeline.lua` (+ `card_anim`) | сборка, прогон боя, атак «в спину», арены |
 | 3c | Вынос `scripts/view/board.lua` (diff-синхронизация, идентичность карт, `content_row` арены) и `scripts/view/hud.lua`; `world.script` — тонкий координатор | сборка, ручная игра всех режимов |
 

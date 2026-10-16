@@ -23,21 +23,20 @@ local highlight = require("core.highlight")
 local rng = require("core.rng")
 local row_seed = require("core.row_seed")
 local style = require("scripts.view.style")
+local fx = require("scripts.view.fx")
 
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
 
 -- Слои отрисовки (position.z). Default-камера Defold рендерит только z в [-1..1], вне диапазона
 -- объект молча не рисуется; больше z = ближе к камере; равный z = порядок не определён.
--- label в cell.go поднят на +0.2 внутри GO: «содержимое» клетки остаётся поверх слоя угроз.
+-- label в card.go поднят на +0.2 внутри GO: «содержимое» клетки остаётся поверх слоя угроз.
 -- Клетки < слой угроз < персонажи < красный «вас видят» < обводки < пунктир < цифры.
+-- Слои обводок/пунктира/цифр заданы в scripts/view/fx.lua.
 local Z_CELL = 0
 local Z_THREAT = 0.1
 local Z_ACTOR = 0.3
 local Z_SPOTTED = 0.4
-local Z_OUTLINE = 0.6
-local Z_DASH = 0.7
-local Z_POPUP = 0.8
 
 -- Слой z — константы кода (порядок отрисовки, не настраиваемые данные).
 -- Презентационные числа вынесены в config-скрипты на том же world.go
@@ -172,7 +171,7 @@ end
 -- Клетка-карта в контейнере рядов: локальные координаты = пространство рядов.
 local function create_card(self, x, y, z)
 	local pos = vmath.vector3(layout.cell_x(x), layout.world_center(y), z)
-	local id = factory.create("#cell_factory", pos)
+	local id = factory.create("#card_factory", pos)
 	if id == nil then
 		print("card create failed: label buffer full (raise [label] max_count in game.project)")
 		return nil
@@ -186,56 +185,7 @@ local function update_card(self, id, x, y, z, text, fill, ink)
 	msg.post(id, "set", card_msg(self, x, y, text, fill, ink))
 end
 
--- Прямоугольник без надписи (обводка, точка пунктира, оверлей угрозы). Эфемерный: в self.fx.
-local function spawn_bar(self, cx, cy, w, h, color, z)
-	local id = factory.create("#bar_factory", vmath.vector3(cx, cy, z))
-	if id == nil then
-		print("bar spawn failed: sprite buffer full (raise [sprite] max_count in game.project)")
-		return
-	end
-	go.set_parent(id, self.rows_id, false)
-	msg.post(id, "set", { width = w, height = h, color = color })
-	table.insert(self.fx, id)
-end
-
--- Обводка клетки: четыре полоски в зазоре между клетками. Координаты — пространство рядов.
-local function draw_outline(self, cx, cy, w, h, color)
-	local gap = self.cell_gap
-	local border = self.border_width
-	local ox = (w - gap) / 2 + border / 2
-	local oy = (h - gap) / 2 + border / 2
-	spawn_bar(self, cx, cy + oy, w, border, color, Z_OUTLINE)
-	spawn_bar(self, cx, cy - oy, w, border, color, Z_OUTLINE)
-	spawn_bar(self, cx - ox, cy, border, h, color, Z_OUTLINE)
-	spawn_bar(self, cx + ox, cy, border, h, color, Z_OUTLINE)
-end
-
--- Тонкая пунктирная линия от точки (ax, ay) до (bx, by), верхний слой. Пространство рядов.
-local function draw_dashed(self, ax, ay, bx, by)
-	for _, p in ipairs(highlight.dash_points(ax, ay, bx, by, self.dash_step)) do
-		spawn_bar(self, p.x, p.y, self.dash_size, self.dash_size, self.pal.dot, Z_DASH)
-	end
-end
-
--- Оверлей угрозы поверх клетки: цвет с заданной непрозрачностью, в своём слое z.
-local function draw_threat(self, cx, cy, h, color, alpha, z)
-	spawn_bar(self, cx, cy, layout.CELL_W - self.cell_gap, h - self.cell_gap,
-		vmath.vector4(color.x, color.y, color.z, alpha), z)
-end
-
--- Всплывающая цифра над клеткой (x, y); kind — цвет из свойств popup.script,
--- dx — разброс при нескольких цифрах на одной клетке.
-local function spawn_popup(self, x, y, text, kind, dx)
-	local px = layout.cell_x(x) + (dx or 0)
-	local py = layout.world_center(y) + layout.row_height(y) * self.popup_y_factor
-	local id = factory.create("#popup_factory", vmath.vector3(px, py, Z_POPUP))
-	if id == nil then
-		print("popup create failed: label buffer full (raise [label] max_count in game.project)")
-		return
-	end
-	go.set_parent(id, self.rows_id, false)
-	msg.post(id, "show", { text = text, kind = kind })
-end
+-- Эфемерные ГО (обводки, пунктир, угрозы, цифры) — в scripts/view/fx.lua.
 
 -- id карты клетки (x, y) из последней синхронизации; nil — карты нет на экране.
 local function card_id_at(self, x, y)
@@ -369,10 +319,7 @@ local function refresh(self)
 	sync_cells(self, pr)
 	sync_player(self, pr)
 	sync_boss(self, pr)
-	for _, id in ipairs(self.fx) do
-		go.delete(id)
-	end
-	self.fx = {}
+	fx.clear(self)
 	-- Слой угроз: поверх клеток, под персонажами и содержимым (GDD §5.4).
 	for _, y in ipairs(layout.visible_rows(pr)) do
 		local vision_row = highlight.vision(content_row(self, y), y)
@@ -383,9 +330,9 @@ local function refresh(self)
 			if alpha ~= nil then
 				if y == pr and x == self.world.pos.x and self.world.mode == MODES.WORLD then
 					-- Игрок в поле зрения: его клетка красная, поверх спрайта персонажа, под надписью.
-					draw_threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED)
+					fx.threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED)
 				else
-					draw_threat(self, layout.cell_x(x), cy, h, self.pal.vision, alpha, Z_THREAT)
+					fx.threat(self, layout.cell_x(x), cy, h, self.pal.vision, alpha, Z_THREAT)
 				end
 			end
 		end
@@ -395,24 +342,24 @@ local function refresh(self)
 		-- Подсветка ходов на следующий ряд (шаг, прыжок, атака по врагу).
 		local up_y = pr + 1
 		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, get_row(self, up_y))) do
-			draw_outline(self, layout.cell_x(m.x), layout.world_center(up_y),
+			fx.outline(self, layout.cell_x(m.x), layout.world_center(up_y),
 				layout.CELL_W, layout.row_height(up_y), self.pal[OUTLINE_KEY[m.kind]])
 		end
 		-- Пунктир до каждой цели, в которую выстрел возможен.
 		local py = layout.world_center(pr)
 		for _, x in ipairs(highlight.shot_targets(self.world.pos, get_row(self, pr), self.player.weapon, reach)) do
-			draw_dashed(self, layout.cell_x(self.world.pos.x), py, layout.cell_x(x), py)
+			fx.dashed(self, layout.cell_x(self.world.pos.x), py, layout.cell_x(x), py)
 		end
 	elseif self.world.mode == MODES.BOSS and self.arena ~= nil then
 		-- Подсветка ходов по X на ряду игрока и пунктир выстрела по боссу.
 		local a = self.arena
 		for _, m in ipairs(highlight.arena_moves(a)) do
-			draw_outline(self, layout.cell_x(m.x), layout.world_center(pr),
+			fx.outline(self, layout.cell_x(m.x), layout.world_center(pr),
 				layout.CELL_W, layout.row_height(pr), self.pal[OUTLINE_KEY[m.kind]])
 		end
 		local boss_x = highlight.arena_shot(a, self.player.weapon, reach)
 		if boss_x ~= nil then
-			draw_dashed(self, layout.cell_x(a.player_x), layout.world_center(pr),
+			fx.dashed(self, layout.cell_x(a.player_x), layout.world_center(pr),
 				layout.cell_x(boss_x), layout.world_center(pr + 1))
 		end
 	end
@@ -500,7 +447,7 @@ local function slide_step(self, from_x, from_y, to_x, to_y)
 end
 
 -- Падение поверженной карты: вниз с уходом в прозрачность (GDD §16, событие death/enemy_dead).
--- Длительность и цвет — свойства cell.script; offset считается от высоты ряда.
+-- Длительность и цвет — свойства card.script; offset считается от высоты ряда.
 local function fall_message(self, id, y)
 	msg.post(id, "fall", {
 		offset = vmath.vector3(0, -layout.row_height(y) * self.fall_drop, 0),
@@ -535,7 +482,7 @@ local function steps_step(self, from_x, from_y, events)
 			}))
 			local dx = (i - 1) * self.popup_spread - self.popup_spread / 2
 			table.insert(steps, function(next)
-				spawn_popup(self, from_x, from_y, "-" .. e.damage, "damage", dx)
+				fx.popup(self, from_x, from_y, "-" .. e.damage, "damage", dx)
 				hud_flash(self)
 				next()
 			end)
@@ -558,10 +505,10 @@ local function steps_step(self, from_x, from_y, events)
 		local lx, ly = self.world.pos.x, self.world.pos.y
 		table.insert(steps, function(next)
 			if heal ~= nil then
-				spawn_popup(self, lx, ly, "+" .. heal.amount, "heal", 0)
+				fx.popup(self, lx, ly, "+" .. heal.amount, "heal", 0)
 			end
 			if gold ~= nil then
-				spawn_popup(self, lx, ly, "+" .. gold.amount, "gold", self.popup_spread)
+				fx.popup(self, lx, ly, "+" .. gold.amount, "gold", self.popup_spread)
 			end
 			next()
 		end)
@@ -593,8 +540,8 @@ local function steps_melee(self, from_x, from_y, tx, ty, events)
 	}))
 	table.insert(steps, function(next)
 		-- Отскок завершён: цифры урона, мигание экрана (урон по игроку), поверженный враг падает.
-		spawn_popup(self, tx, ty, "-" .. poke.dealt_to_enemy, "damage", 0)
-		spawn_popup(self, from_x, from_y, "-" .. poke.dealt_to_player, "damage", self.popup_spread)
+		fx.popup(self, tx, ty, "-" .. poke.dealt_to_enemy, "damage", 0)
+		fx.popup(self, from_x, from_y, "-" .. poke.dealt_to_player, "damage", self.popup_spread)
 		hud_flash(self)
 		if dead ~= nil then
 			if enemy_card ~= nil then
@@ -628,7 +575,7 @@ local function steps_shoot(self, x, events)
 	local y = self.world.pos.y
 	local id = card_id_at(self, x, y)
 	table.insert(steps, function(next)
-		spawn_popup(self, x, y, "-" .. shot.damage, "damage", 0)
+		fx.popup(self, x, y, "-" .. shot.damage, "damage", 0)
 		next()
 	end)
 	table.insert(steps, card_anim(self, id, "flash", {}))
@@ -662,13 +609,13 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 			offset = lunge_offset(mid_x, from_y, boss_from_x, from_y + 1, 0.55),
 		}))
 		table.insert(steps, function(next)
-			spawn_popup(self, boss_from_x, from_y + 1, "-" .. pattack.damage, "damage", 0)
+			fx.popup(self, boss_from_x, from_y + 1, "-" .. pattack.damage, "damage", 0)
 			next()
 		end)
 	end
 	if heal ~= nil then
 		table.insert(steps, function(next)
-			spawn_popup(self, mid_x, from_y, "+" .. balance.cells.HEAL.amount, "heal", 0)
+			fx.popup(self, mid_x, from_y, "+" .. balance.cells.HEAL.amount, "heal", 0)
 			next()
 		end)
 	end
@@ -690,7 +637,7 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 			offset = lunge_offset(boss_to_x, from_y + 1, mid_x, from_y, 0.55),
 		}))
 		table.insert(steps, function(next)
-			spawn_popup(self, mid_x, from_y, "-" .. battack.damage, "damage", 0)
+			fx.popup(self, mid_x, from_y, "-" .. battack.damage, "damage", 0)
 			hud_flash(self)
 			if outcome == "defeat" then
 				table.insert(steps, card_anim(self, self.player_go, "fall", {
@@ -711,7 +658,7 @@ local function steps_arena_shot(self, boss_x, row, shot, won, win_target)
 	local steps = {}
 	if shot ~= nil then
 		table.insert(steps, function(next)
-			spawn_popup(self, boss_x, row + 1, "-" .. shot.damage, "damage", 0)
+			fx.popup(self, boss_x, row + 1, "-" .. shot.damage, "damage", 0)
 			next()
 		end)
 		table.insert(steps, card_anim(self, self.boss_go, "flash", {}))

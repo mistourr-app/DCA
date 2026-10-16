@@ -2,8 +2,9 @@
 # Не влияет на правила игры (правила — в balance/balance.csv), но доступно core/*,
 # который не видит Defold и go.property.
 # Остальные презентационные числа (длительности и кривые анимаций, палитра, размеры
-# обводок и пунктира) — go.property скриптов экрана: world.script, cell.script,
-# popup.script, hud.gui_script. Правило: docs/AI_CODING_RULES.md, раздел "источники чисел".
+# обводок и пунктира) — go.property скриптов экрана: geom_cfg.script, anim_cfg.script,
+# flash_cfg.script, palette_cfg.script, card.script, popup.script.
+# Правило: docs/AI_CODING_RULES.md, раздел "источники чисел".
 # Формат: path,value,notes. Генерация: python tools/build_balance.py -> core/data/design.lua.
 
 # --- Screen (logical pixels, portrait 720x1280) ---
