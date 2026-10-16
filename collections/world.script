@@ -24,6 +24,7 @@ local rng = require("core.rng")
 local row_seed = require("core.row_seed")
 local style = require("scripts.view.style")
 local fx = require("scripts.view.fx")
+local timeline = require("scripts.view.timeline")
 
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
@@ -367,48 +368,9 @@ end
 
 -- ================= Анимации =================
 
--- Таймлайн: последовательность шагов function(next). Ввод блокирован до конца; done — финал.
-local function play_timeline(self, steps, done)
-	self.anim_steps = steps
-	self.anim_done = done
-	self.input_locked = true
-	local function advance()
-		local f = table.remove(self.anim_steps, 1)
-		if f == nil then
-			self.input_locked = false
-			self.anim_done()
-			return
-		end
-		f(advance)
-	end
-	advance()
-end
-
--- Шаги, которым нужен ответ карты, регистрируют продолжение по токену;
--- карта шлёт "anim_done" {token} в sender своего сообщения.
+-- Раннер таймлайна и ожидание "anim_done" — в scripts/view/timeline.lua.
 function on_message(self, message_id, message, sender)
-	if message_id == hash("anim_done") and message.token ~= nil then
-		local cont = self.anim_waiters[message.token]
-		if cont ~= nil then
-			self.anim_waiters[message.token] = nil
-			cont()
-		end
-	end
-end
-
--- Шаг: отправить карте анимационное сообщение и дождаться "anim_done".
--- Нет карты (вне экрана) — шаг проходит сразу.
-local function card_anim(self, id, name, payload)
-	return function(next)
-		if id == nil then
-			next()
-			return
-		end
-		self.anim_token = self.anim_token + 1
-		self.anim_waiters[self.anim_token] = next
-		payload.token = self.anim_token
-		msg.post(id, name, payload)
-	end
+	timeline.on_message(self, message_id, message, sender)
 end
 
 -- Таймлайн перемещения: карта игрока приподнимается, летит в новую клетку, контейнер рядов
@@ -477,7 +439,7 @@ local function steps_step(self, from_x, from_y, events)
 	if #behinds > 0 then
 		-- Несколько врагов бьют «в спину» последовательно: выпад, цифра, вспышка — на каждого.
 		for i, e in ipairs(behinds) do
-			table.insert(steps, card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
+			table.insert(steps, timeline.card_anim(self, card_id_at(self, e.enemy_x, from_y), "lunge", {
 				offset = lunge_offset(e.enemy_x, from_y, from_x, from_y, 0.6),
 			}))
 			local dx = (i - 1) * self.popup_spread - self.popup_spread / 2
@@ -493,7 +455,7 @@ local function steps_step(self, from_x, from_y, events)
 			hud_flash(self)
 			next()
 		end)
-		table.insert(steps, card_anim(self, self.player_go, "fall", {
+		table.insert(steps, timeline.card_anim(self, self.player_go, "fall", {
 			offset = vmath.vector3(0, -layout.row_height(from_y) * self.fall_drop, 0),
 		}))
 		return steps
@@ -535,7 +497,7 @@ local function steps_melee(self, from_x, from_y, tx, ty, events)
 	end
 	local player_card = self.player_go
 	local enemy_card = card_id_at(self, tx, ty)
-	table.insert(steps, card_anim(self, player_card, "lunge", {
+	table.insert(steps, timeline.card_anim(self, player_card, "lunge", {
 		offset = lunge_offset(from_x, from_y, tx, ty, 0.6),
 	}))
 	table.insert(steps, function(next)
@@ -549,7 +511,7 @@ local function steps_melee(self, from_x, from_y, tx, ty, events)
 			end
 			table.insert(steps, slide_step(self, from_x, from_y, tx, ty))
 		else
-			table.insert(steps, card_anim(self, player_card, "fall", {
+			table.insert(steps, timeline.card_anim(self, player_card, "fall", {
 				offset = vmath.vector3(0, -layout.row_height(from_y) * self.fall_drop, 0),
 			}))
 		end
@@ -578,7 +540,7 @@ local function steps_shoot(self, x, events)
 		fx.popup(self, x, y, "-" .. shot.damage, "damage", 0)
 		next()
 	end)
-	table.insert(steps, card_anim(self, id, "flash", {}))
+	table.insert(steps, timeline.card_anim(self, id, "flash", {}))
 	if dead ~= nil and id ~= nil then
 		table.insert(steps, function(next)
 			fall_message(self, id, y)
@@ -605,7 +567,7 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 		end
 	end
 	if pattack ~= nil then
-		table.insert(steps, card_anim(self, self.player_go, "lunge", {
+		table.insert(steps, timeline.card_anim(self, self.player_go, "lunge", {
 			offset = lunge_offset(mid_x, from_y, boss_from_x, from_y + 1, 0.55),
 		}))
 		table.insert(steps, function(next)
@@ -633,14 +595,14 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 					go.EASING_INOUTQUAD, self.move_ms / 1000, 0, next)
 			end)
 		end
-		table.insert(steps, card_anim(self, self.boss_go, "lunge", {
+		table.insert(steps, timeline.card_anim(self, self.boss_go, "lunge", {
 			offset = lunge_offset(boss_to_x, from_y + 1, mid_x, from_y, 0.55),
 		}))
 		table.insert(steps, function(next)
 			fx.popup(self, mid_x, from_y, "-" .. battack.damage, "damage", 0)
 			hud_flash(self)
 			if outcome == "defeat" then
-				table.insert(steps, card_anim(self, self.player_go, "fall", {
+				table.insert(steps, timeline.card_anim(self, self.player_go, "fall", {
 					offset = vmath.vector3(0, -layout.row_height(from_y) * self.fall_drop, 0),
 				}))
 			end
@@ -661,7 +623,7 @@ local function steps_arena_shot(self, boss_x, row, shot, won, win_target)
 			fx.popup(self, boss_x, row + 1, "-" .. shot.damage, "damage", 0)
 			next()
 		end)
-		table.insert(steps, card_anim(self, self.boss_go, "flash", {}))
+		table.insert(steps, timeline.card_anim(self, self.boss_go, "flash", {}))
 	end
 	if won and win_target ~= nil then
 		table.insert(steps, slide_step(self, self.world.pos.x, row, win_target.x, win_target.y))
@@ -853,7 +815,7 @@ local function arena_move(self, x)
 	if #steps == 0 then
 		finish_view(self)
 	else
-		play_timeline(self, steps, function()
+		timeline.play(self, steps, function()
 			finish_view(self)
 		end)
 	end
@@ -879,7 +841,7 @@ local function arena_shoot(self)
 	if #steps == 0 then
 		finish_view(self)
 	else
-		play_timeline(self, steps, function()
+		timeline.play(self, steps, function()
 			finish_view(self)
 		end)
 	end
@@ -898,7 +860,7 @@ local function world_action(self, action_type, x, row)
 		end
 		self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
 		enter_arena(self)
-		play_timeline(self, { slide_step(self, from_x, from_y, x, row) }, function()
+		timeline.play(self, { slide_step(self, from_x, from_y, x, row) }, function()
 			finish_view(self)
 		end)
 		return
@@ -937,7 +899,7 @@ local function world_action(self, action_type, x, row)
 	if #steps == 0 then
 		finish_view(self)
 	else
-		play_timeline(self, steps, function()
+		timeline.play(self, steps, function()
 			finish_view(self)
 		end)
 	end

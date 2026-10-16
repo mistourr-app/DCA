@@ -63,7 +63,8 @@ DCA/
 │   ├── saves.lua                sys.save / sys.load, путь, версия
 │   └── view/
 │       ├── style.lua            view-registry: тип карты -> символ + роли палитры
-│       └── fx.lua               эфемерные ГО: обводки, пунктир, угрозы, цифры
+│       ├── fx.lua               эфемерные ГО: обводки, пунктир, угрозы, цифры
+│       └── timeline.lua         раннер анимаций и ожидание anim_done
 ├── input/game.input_binding     привязки ввода (touch)
 ├── collections/
 │   ├── world.collection         точка входа: мир, HUD, контейнер рядов
