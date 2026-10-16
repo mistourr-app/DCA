@@ -1,0 +1,8 @@
+-- Длительности и смещения анимаций поля (мс, доли высоты ряда).
+-- Презентационные числа; правятся в инспекторе инстанса world (docs/DEFOLD_INTEGRATION.md §5.2).
+-- Читает collections/world.script через go.get("#anim_cfg", ...).
+
+go.property("move_ms", 250)
+go.property("fall_drop", 0.8)
+go.property("popup_spread", 42)
+go.property("popup_y_factor", 0.2)

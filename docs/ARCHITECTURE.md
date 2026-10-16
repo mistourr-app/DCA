@@ -66,7 +66,11 @@ DCA/
 │   ├── world.collection         точка входа: мир, HUD, контейнер рядов
 │   └── world.script             координатор: ввод, режимы, вызовы core, таймлайн
 ├── game_objects/
-│   ├── world.go                 объект мира (несёт world.script и config-компоненты)
+│   ├── world.go                 объект мира (world.script + config-компоненты)
+│   ├── geom_cfg.script          конфиг геометрии (go.property)
+│   ├── anim_cfg.script          конфиг анимаций поля
+│   ├── flash_cfg.script         конфиг вспышки HUD
+│   ├── palette_cfg.script       конфиг палитры
 │   ├── cell.go/.script          универсальная карта поля (спрайт + label + анимации)
 │   ├── cell_factory.factory     фабрика карт
 │   ├── cell_sprite.sprite, cell_label.label

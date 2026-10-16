@@ -1,0 +1,31 @@
+-- Палитра (GDD §16): фон и подпись типов карт, цвета подсветок.
+-- Этап 1 сохраняет имена color_*; этап 2 заменит их ролями
+-- (docs/DEFOLD_INTEGRATION.md §5.2, §7). Правятся в инспекторе инстанса world.
+-- Дефолты go.property — только литералы: значения пересчитаны из палитры GDD (hex/255).
+
+-- Фон (fill) и цвет подписи (ink) каждого типа карты.
+go.property("color_empty_fill", vmath.vector4(0.102, 0.114, 0.157, 1))
+go.property("color_empty_ink", vmath.vector4(0.102, 0.114, 0.157, 1))
+go.property("color_wall_fill", vmath.vector4(0.247, 0.271, 0.337, 1))
+go.property("color_wall_ink", vmath.vector4(0.627, 0.651, 0.706, 1))
+go.property("color_heal_fill", vmath.vector4(0.063, 0.725, 0.506, 1))
+go.property("color_heal_ink", vmath.vector4(0, 0, 0, 1))
+go.property("color_gold_fill", vmath.vector4(1, 0.906, 0.38, 1))
+go.property("color_gold_ink", vmath.vector4(0, 0, 0, 1))
+go.property("color_enemy_fill", vmath.vector4(1, 0.122, 0.122, 1))
+go.property("color_enemy_ink", vmath.vector4(1, 1, 1, 1))
+go.property("color_camp_fill", vmath.vector4(0.361, 0.98, 1, 1))
+go.property("color_camp_ink", vmath.vector4(0, 0, 0, 1))
+go.property("color_attack_fill", vmath.vector4(0.769, 0, 0.078, 1))
+go.property("color_attack_ink", vmath.vector4(1, 1, 1, 1))
+go.property("color_player_fill", vmath.vector4(1, 1, 1, 1))
+go.property("color_player_ink", vmath.vector4(0, 0, 0, 1))
+
+-- Подсветки (GDD §5.4, §12): шаг — зелёная, прыжок — фиолетовая, атака — красная;
+-- пунктир выстрела белый; зрение врагов — оранжевый оверлей, красный — клетка игрока под наблюдением.
+go.property("color_outline_step", vmath.vector4(0.063, 0.725, 0.506, 1))
+go.property("color_outline_jump", vmath.vector4(0.62, 0.427, 1, 1))
+go.property("color_outline_attack", vmath.vector4(1, 0.122, 0.122, 1))
+go.property("color_dot", vmath.vector4(1, 1, 1, 1))
+go.property("color_vision", vmath.vector4(1, 0.451, 0.106, 1))
+go.property("color_spotted", vmath.vector4(1, 0.122, 0.122, 1))

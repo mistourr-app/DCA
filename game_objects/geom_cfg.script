@@ -1,0 +1,8 @@
+-- Геометрия поля: зазоры, толщина обводок, шаг и размер пунктира.
+-- Презентационные числа; правятся в инспекторе инстанса world (docs/DEFOLD_INTEGRATION.md §5.2).
+-- Читает collections/world.script через go.get("#geom_cfg", ...).
+
+go.property("cell_gap", 8)
+go.property("border_width", 4)
+go.property("dash_step", 16)
+go.property("dash_size", 4)

@@ -41,7 +41,11 @@
 ```
 collections/world.collection
 ├── world  (game_objects/world.go)
-│     ├── world          → collections/world.script    34 go.property
+│     ├── world          → collections/world.script    (1 go.property: debug_seed)
+│     ├── geom_cfg        → game_objects/geom_cfg.script
+│     ├── anim_cfg        → game_objects/anim_cfg.script
+│     ├── flash_cfg       → game_objects/flash_cfg.script
+│     ├── palette_cfg     → game_objects/palette_cfg.script
 │     ├── cell_factory    → game_objects/cell.go        (5 go.property в cell.script)
 │     ├── bar_factory     → game_objects/bar.go
 │     ├── popup_factory   → game_objects/popup.go        (5 go.property в popup.script)
@@ -58,16 +62,20 @@ collections/world.collection
 
 | Скрипт | Свойств | Что содержит |
 |---|---:|---|
-| `collections/world.script` | 34 | `move_ms`, `debug_seed`, `cell_gap`, `border_width`, `dash_step`, `dash_size`, `popup_spread`, `popup_y_factor`, `fall_drop`; палитра (8 типов × fill/ink); обводки/пунктир/угрозы (6 цветов); вспышка (`color_flash`, `flash_alpha`, `flash_ms`) |
+| `collections/world.script` | 1 | `debug_seed` (параметр мира: 0 — новый мир, иначе фиксированный seed) |
+| `game_objects/geom_cfg.script` | 4 | `cell_gap`, `border_width`, `dash_step`, `dash_size` |
+| `game_objects/anim_cfg.script` | 4 | `move_ms`, `fall_drop`, `popup_spread`, `popup_y_factor` |
+| `game_objects/flash_cfg.script` | 3 | `color_flash`, `flash_alpha`, `flash_ms` |
+| `game_objects/palette_cfg.script` | 22 | палитра: фон/подпись 8 типов, обводки/пунктир/угрозы (имена `color_*`; этап 2 — роли) |
 | `game_objects/cell.script` | 5 | `lift_scale`, `lunge_ms`, `fall_ms`, `flash_ms`, `flash_color` |
 | `game_objects/popup.script` | 5 | `float_ms`, `float_rise`, `color_damage`, `color_heal`, `color_gold` |
 | `gui/hud.gui_script` | 0 | невозможно; параметры вспышки приходят сообщением `flash` |
 
-Число `34` — объявления `go.property(` в `world.script`; `37` — вхождения слова с учётом трёх упоминаний в комментариях.
+`world.script` читает конфиги через `go.get("#geom_cfg", ...)` и держит значения в `self` (`read_config`), проверяя при старте полноту палитры (`check_palette`).
 
 ### 3.3 Метрики
 
-- `collections/world.script` — 1119 строк: ввод, маршрутизация режимов, раннер таймлайна, отрисовка (карты/обводки/пунктир/угрозы/цифры), палитра, HUD, лагерь, смерть, сохранения.
+- `collections/world.script` — 1141 строка: ввод, маршрутизация режимов, раннер таймлайна, отрисовка (карты/обводки/пунктир/угрозы/цифры), чтение конфигов, HUD, лагерь, смерть, сохранения.
 - Привязки типов зашиты в `world.script`: `SYMBOL`, `FILL_KEY`, `INK_KEY`, `PLAYER_TEXT`.
 - Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском.
 
@@ -77,17 +85,20 @@ collections/world.collection
 
 ### 4.1 Проблемы
 
-Текущие:
+Снято этапами из §7:
+
+- _(этап 1)_ Плоский список 34 свойств на компоненте `world` → свойства разнесены по `geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg` (§3.2).
+
+Осталось:
 
 1. **Монолит `world.script`.** Логика координатора, отрисовки и данных в одном файле. При росте типов сущностей и механик файл превратится в спагетти.
-2. **Плоский список 34 свойств** на одном компоненте `world`. В Outliner это один длинный список без групп.
-3. **Привязки типов зашиты в мировой скрипт.** Новый тип клетки/врага/объекта требует правки `world.script` — нарушает принцип реестра (`docs/ENTITY_REGISTRY.md` §1.3): новая сущность не должна трогать ядро или игровой цикл.
-4. **Палитра «на каждый тип»** (16 цветов fill/ink) растёт линейно с числом типов. При этом сейчас все враги и так одного цвета (различаются буквой и числом HP).
+2. **Привязки типов зашиты в мировой скрипт.** Новый тип клетки/врага/объекта требует правки `world.script` — нарушает принцип реестра (`docs/ENTITY_REGISTRY.md` §1.3): новая сущность не должна трогать ядро или игровой цикл.
+3. **Палитра «на каждый тип»** (16 цветов fill/ink) растёт линейно с числом типов. При этом сейчас все враги и так одного цвета (различаются буквой и числом HP).
 
 Потенциальные (при росте):
 
-5. **Дублирование анимаций.** Если появятся сущности с иной формой (босс-мультиклетка, ловушка, сундук), логика lift/lunge/fall/flash может размножиться по скриптам.
-6. **Doc drift.** Дисциплина: при изменении структуры сначала правки в `docs/ARCHITECTURE.md` §2, затем код. Ранее документация описывала `main/`, `camp.collection`, `player/enemy/boss.go` — карта приведена к факту (фаза 1, §8).
+4. **Дублирование анимаций.** Если появятся сущности с иной формой (босс-мультиклетка, ловушка, сундук), логика lift/lunge/fall/flash может размножиться по скриптам.
+5. **Doc drift.** Дисциплина: при изменении структуры сначала правки в `docs/ARCHITECTURE.md` §2, затем код. Ранее документация описывала `main/`, `camp.collection`, `player/enemy/boss.go` — карта приведена к факту (фаза 1, §8).
 
 ### 4.2 Ограничения движка (данность, не проблемы)
 
@@ -204,7 +215,7 @@ return M
 | Этап | Содержание | Проверка |
 |---|---|---|
 | 0 | Синхронизация документации под текущий факт | **Выполнено** (фаза 1: `ARCHITECTURE`, `AI_CODING_RULES`, `BALANCE`, `TESTING`, `ENGINE_DEFOLD`, `CONVENTIONS`, `PLAN`; `PLAN_14` удалён) |
-| 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка ролей при старте | сборка 1.14.0, лог без ERROR, ручная игра; приёмочный критерий §5.2 |
+| 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка полноты палитры при старте | **Выполнено**; сборка 1.14.0, лог без ERROR, ручная игра |
 | 2 | Роль-палитра + `scripts/view/style.lua`; снятие `SYMBOL`/`FILL_KEY`/`INK_KEY` из `world.script`; проверка style → palette (§5.6) | сборка, ручная сверка вида клеток/врагов/игрока |
 | 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | ревью, поведение не меняется |
 | 3a | Переименование `cell.go`/`cell.script` → `card.go`/`card.script` (правки ссылок в фабрике, `world.go`, `world.script`); вынос `scripts/view/fx.lua` | сборка, ручная игра |

@@ -39,53 +39,32 @@ local Z_DASH = 0.7
 local Z_POPUP = 0.8
 
 -- Слой z — константы кода (порядок отрисовки, не настраиваемые данные).
--- Остальные презентационные числа — go.property: правятся в инспекторе инстанса world
--- в коллекции (значения пишутся в .collection) или руками в этом файле/коллекции.
+-- Презентационные числа вынесены в config-скрипты на том же world.go
+-- (docs/DEFOLD_INTEGRATION.md §5.2): geom_cfg, anim_cfg, flash_cfg, palette_cfg.
+-- Значения читаются один раз в init (go.get) и живут в self.
 
--- Зазор между клетками: спрайты клеток, оверлеи и обводки входят в него с отступом.
--- move_ms — длительность полёта карты и скролла ряда (синхронно), debug_seed ≠ 0 —
--- фиксированный seed мира для тюнинга (в репозитории всегда 0).
-go.property("move_ms", 250)
+-- debug_seed ≠ 0 фиксирует seed мира для тюнинга (в репозитории всегда 0).
+-- Это параметр мира, а не презентация: единственное go.property на world.script.
 go.property("debug_seed", 0)
-go.property("cell_gap", 8)
-go.property("border_width", 4)
-go.property("dash_step", 16)
-go.property("dash_size", 4)
-go.property("popup_spread", 42)
-go.property("popup_y_factor", 0.2)
-go.property("fall_drop", 0.8)
 
--- Палитра (GDD §16, фоны клеток): фон (fill) и цвет подписи (ink) каждого типа карты.
--- Дефолты go.property — только литералы: значения уже пересчитаны из палитры GDD (hex/255).
-go.property("color_empty_fill", vmath.vector4(0.102, 0.114, 0.157, 1))
-go.property("color_empty_ink", vmath.vector4(0.102, 0.114, 0.157, 1))
-go.property("color_wall_fill", vmath.vector4(0.247, 0.271, 0.337, 1))
-go.property("color_wall_ink", vmath.vector4(0.627, 0.651, 0.706, 1))
-go.property("color_heal_fill", vmath.vector4(0.063, 0.725, 0.506, 1))
-go.property("color_heal_ink", vmath.vector4(0, 0, 0, 1))
-go.property("color_gold_fill", vmath.vector4(1, 0.906, 0.38, 1))
-go.property("color_gold_ink", vmath.vector4(0, 0, 0, 1))
-go.property("color_enemy_fill", vmath.vector4(1, 0.122, 0.122, 1))
-go.property("color_enemy_ink", vmath.vector4(1, 1, 1, 1))
-go.property("color_camp_fill", vmath.vector4(0.361, 0.98, 1, 1))
-go.property("color_camp_ink", vmath.vector4(0, 0, 0, 1))
-go.property("color_attack_fill", vmath.vector4(0.769, 0, 0.078, 1))
-go.property("color_attack_ink", vmath.vector4(1, 1, 1, 1))
-go.property("color_player_fill", vmath.vector4(1, 1, 1, 1))
-go.property("color_player_ink", vmath.vector4(0, 0, 0, 1))
--- Подсветки (GDD §5.4, §12): шаг — зелёная, прыжок — фиолетовая, атака — красная;
--- пунктир выстрела белый; зрение врагов — оранжевый оверлей, красный — клетка игрока под наблюдением.
-go.property("color_outline_step", vmath.vector4(0.063, 0.725, 0.506, 1))
-go.property("color_outline_jump", vmath.vector4(0.62, 0.427, 1, 1))
-go.property("color_outline_attack", vmath.vector4(1, 0.122, 0.122, 1))
-go.property("color_dot", vmath.vector4(1, 1, 1, 1))
-go.property("color_vision", vmath.vector4(1, 0.451, 0.106, 1))
-go.property("color_spotted", vmath.vector4(1, 0.122, 0.122, 1))
--- Мигание экрана при уроне по игроку (GDD §16). gui-скрипты не поддерживают go.property,
--- поэтому параметры живут здесь и приходят в HUD сообщением "flash".
-go.property("color_flash", vmath.vector4(1, 0.05, 0.05, 1))
-go.property("flash_alpha", 0.45)
-go.property("flash_ms", 150)
+local GEOM_CFG = "#geom_cfg"
+local ANIM_CFG = "#anim_cfg"
+local FLASH_CFG = "#flash_cfg"
+local PALETTE_CFG = "#palette_cfg"
+
+-- Ключи палитры в palette_cfg (этап 1 — имена color_*; этап 2 заменит их ролями).
+local PALETTE_KEYS = {
+	"color_empty_fill", "color_empty_ink",
+	"color_wall_fill", "color_wall_ink",
+	"color_heal_fill", "color_heal_ink",
+	"color_gold_fill", "color_gold_ink",
+	"color_enemy_fill", "color_enemy_ink",
+	"color_camp_fill", "color_camp_ink",
+	"color_attack_fill", "color_attack_ink",
+	"color_player_fill", "color_player_ink",
+	"color_outline_step", "color_outline_jump", "color_outline_attack",
+	"color_dot", "color_vision", "color_spotted",
+}
 
 -- Символы типов карт (текст — не число, остаётся в коде).
 local SYMBOL = {
@@ -107,6 +86,47 @@ local INK_KEY = {
 local OUTLINE_KEY = {
 	step = "color_outline_step", jump = "color_outline_jump", attack = "color_outline_attack",
 }
+
+-- Чтение config-компонентов один раз при старте. Значения go.property — константы сборки,
+-- порядок init владельца не важен (docs/DEFOLD_INTEGRATION.md §4.2).
+local function read_config(self)
+	self.cell_gap = go.get(GEOM_CFG, "cell_gap")
+	self.border_width = go.get(GEOM_CFG, "border_width")
+	self.dash_step = go.get(GEOM_CFG, "dash_step")
+	self.dash_size = go.get(GEOM_CFG, "dash_size")
+	self.move_ms = go.get(ANIM_CFG, "move_ms")
+	self.fall_drop = go.get(ANIM_CFG, "fall_drop")
+	self.popup_spread = go.get(ANIM_CFG, "popup_spread")
+	self.popup_y_factor = go.get(ANIM_CFG, "popup_y_factor")
+	self.color_flash = go.get(FLASH_CFG, "color_flash")
+	self.flash_alpha = go.get(FLASH_CFG, "flash_alpha")
+	self.flash_ms = go.get(FLASH_CFG, "flash_ms")
+	self.pal = {}
+	for _, key in ipairs(PALETTE_KEYS) do
+		self.pal[key] = go.get(PALETTE_CFG, key)
+	end
+end
+
+-- Проверка связей вид -> палитра при старте: пропущенная роль дала бы тихий nil и падение в бою.
+local function check_palette(self)
+	local function need(desc, key)
+		if self.pal[key] == nil then
+			error("palette_cfg: нет свойства " .. key .. " для " .. desc)
+		end
+	end
+	for _, key in pairs(FILL_KEY) do
+		need("fill", key)
+	end
+	for _, key in pairs(INK_KEY) do
+		need("ink", key)
+	end
+	for _, key in pairs(OUTLINE_KEY) do
+		need("outline", key)
+	end
+	need("dot", "color_dot")
+	need("vision", "color_vision")
+	need("spotted", "color_spotted")
+end
 
 local function has_event(events, type_)
 	for _, e in ipairs(events) do
@@ -160,8 +180,8 @@ local function cell_view(self, cell)
 		local t = registry.enemies.types[cell.enemy]
 		text = t.label:sub(1, 1) .. tostring(cell.hp or t.base_hp)
 	end
-	local fill = self[FILL_KEY[cell.type] or FILL_KEY.EMPTY]
-	local ink = self[INK_KEY[cell.type] or INK_KEY.EMPTY]
+	local fill = self.pal[FILL_KEY[cell.type] or FILL_KEY.EMPTY]
+	local ink = self.pal[INK_KEY[cell.type] or INK_KEY.EMPTY]
 	return text, fill, ink
 end
 
@@ -215,7 +235,7 @@ end
 -- Тонкая пунктирная линия от точки (ax, ay) до (bx, by), верхний слой. Пространство рядов.
 local function draw_dashed(self, ax, ay, bx, by)
 	for _, p in ipairs(highlight.dash_points(ax, ay, bx, by, self.dash_step)) do
-		spawn_bar(self, p.x, p.y, self.dash_size, self.dash_size, self.color_dot, Z_DASH)
+		spawn_bar(self, p.x, p.y, self.dash_size, self.dash_size, self.pal.color_dot, Z_DASH)
 	end
 end
 
@@ -338,7 +358,7 @@ local function sync_player(self, pr)
 	go.set(self.player_go, "position",
 		vmath.vector3(layout.cell_x(pos.x), layout.world_center(pr), Z_ACTOR))
 	msg.post(self.player_go, "set",
-		card_msg(self, pos.x, pr, PLAYER_TEXT, self.color_player_fill, self.color_player_ink))
+		card_msg(self, pos.x, pr, PLAYER_TEXT, self.pal.color_player_fill, self.pal.color_player_ink))
 end
 
 -- Карта босса: отдельный объект на верхнем ряду арены; создаётся в бою, удаляется по его концу.
@@ -359,7 +379,7 @@ local function sync_boss(self, pr)
 		return
 	end
 	update_card(self, self.boss_go, a.boss_x, boss_y, Z_ACTOR,
-		"B" .. tostring(a.boss_hp), self.color_enemy_fill, self.color_enemy_ink)
+		"B" .. tostring(a.boss_hp), self.pal.color_enemy_fill, self.pal.color_enemy_ink)
 end
 
 -- Перерисовка: прокрутка контейнера, diff клеток, персонажи, эфемерные подсветки.
@@ -383,9 +403,9 @@ local function refresh(self)
 			if alpha ~= nil then
 				if y == pr and x == self.world.pos.x and self.world.mode == MODES.WORLD then
 					-- Игрок в поле зрения: его клетка красная, поверх спрайта персонажа, под надписью.
-					draw_threat(self, layout.cell_x(x), cy, h, self.color_spotted, alpha, Z_SPOTTED)
+					draw_threat(self, layout.cell_x(x), cy, h, self.pal.color_spotted, alpha, Z_SPOTTED)
 				else
-					draw_threat(self, layout.cell_x(x), cy, h, self.color_vision, alpha, Z_THREAT)
+					draw_threat(self, layout.cell_x(x), cy, h, self.pal.color_vision, alpha, Z_THREAT)
 				end
 			end
 		end
@@ -396,7 +416,7 @@ local function refresh(self)
 		local up_y = pr + 1
 		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, get_row(self, up_y))) do
 			draw_outline(self, layout.cell_x(m.x), layout.world_center(up_y),
-				layout.CELL_W, layout.row_height(up_y), self[OUTLINE_KEY[m.kind]])
+				layout.CELL_W, layout.row_height(up_y), self.pal[OUTLINE_KEY[m.kind]])
 		end
 		-- Пунктир до каждой цели, в которую выстрел возможен.
 		local py = layout.world_center(pr)
@@ -408,7 +428,7 @@ local function refresh(self)
 		local a = self.arena
 		for _, m in ipairs(highlight.arena_moves(a)) do
 			draw_outline(self, layout.cell_x(m.x), layout.world_center(pr),
-				layout.CELL_W, layout.row_height(pr), self[OUTLINE_KEY[m.kind]])
+				layout.CELL_W, layout.row_height(pr), self.pal[OUTLINE_KEY[m.kind]])
 		end
 		local boss_x = highlight.arena_shot(a, self.player.weapon, reach)
 		if boss_x ~= nil then
@@ -997,6 +1017,8 @@ local function world_action(self, action_type, x, row)
 end
 
 function init(self)
+	read_config(self)
+	check_palette(self)
 	msg.post(".", "acquire_input_focus")
 	self.rows_id = go.get_id("rows")
 	local data, found = saves.load()
