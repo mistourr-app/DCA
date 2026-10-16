@@ -187,6 +187,63 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 
 Первая проверка обязательна, вторая — опциональна.
 
+### 5.7 Интерфейсы модулей (этап 3.0)
+
+Все view-модули — **чистые функции без собственного состояния**: первый аргумент — контекст-скрипт `self` (паттерн, уже принятый в `world.script`). Состояние живёт в `self`; таблица фиксирует, кто им владеет.
+
+| Поле в `self` | Владелец | Назначение |
+|---|---|---|
+| `rows` (y → cells) | board | окно сгенерированных рядов (кэш по seed) |
+| `cards` (y → { x → id }) | board | живые ГО-карты поля по координатам |
+| `rows_id` | board | id контейнера `rows`, к которому крепятся карты и fx |
+| `player_go`, `boss_go` | board | карты акторов |
+| `fx` (список id) | fx | временные ГО (bar/popup); очищаются при `refresh` |
+| `anim_steps`, `anim_done` | timeline | очередь шагов и колбэк завершения |
+| `anim_waiters`, `anim_token` | timeline | ожидание ответов `anim_done` от карт |
+
+Модули и сигнатуры (передаётся `self`; префикс — имя модуля):
+
+**`scripts/view/board.lua`** — раскладка, окно рядов, diff-синхронизация карт:
+
+- `board.get_row(self, y) -> cells | nil`
+- `board.content_row(self, y) -> cells` (в бою ряды берутся из арены)
+- `board.cell_sig(cell) -> string`
+- `board.cell_view(self, cell) -> text, fill, ink` (символ/роли через `style`, буква врага — из реестра)
+- `board.card_msg(self, x, y, text, fill, ink) -> table`
+- `board.create(self, x, y, z) -> id | nil`
+- `board.update(self, id, x, y, z, text, fill, ink)`
+- `board.card_id_at(self, x, y) -> id | nil`
+- `board.sync_cells(self, pr)` (пересылает `set` только при смене подписи)
+- `board.sync_player(self, pr)`, `board.sync_boss(self, pr)`
+- `board.lunge_offset(x0, y0, x1, y1, fraction) -> dx, dy` (чистая)
+- `board.refresh(self)` (позиция контейнера; вызывает `fx.clear`)
+
+**`scripts/view/fx.lua`** — одноразовые ГО (обводки, пунктир, угрозы, цифры):
+
+- `fx.bar(self, cx, cy, w, h, color, z) -> id`
+- `fx.outline(self, cx, cy, w, h, color)`
+- `fx.dashed(self, ax, ay, bx, by)`
+- `fx.threat(self, cx, cy, h, color, alpha, z)`
+- `fx.popup(self, x, y, text, kind, dx)`
+- `fx.clear(self)` (удаляет все id из `self.fx` и обнуляет список)
+
+**`scripts/view/timeline.lua`** — раннер очереди шагов:
+
+- `timeline.play(self, steps, done)` — `steps` — список шагов, `done` — колбэк конца
+- `timeline.advance(self)`
+- `timeline.card_anim(self, id, name, payload)` — посылает карте и ждёт `anim_done` по `token`
+- `timeline.on_message(self, message)` — приём `anim_done` от карт (из `on_message` скрипта)
+
+**`scripts/view/anim.lua`** — примитивы анимации ГО, вызывает `card.script`:
+
+- `anim.lift(id, opts)`, `anim.lunge(id, opts)`, `anim.fall(id, opts)`, `anim.flash(id, opts)`
+
+**`scripts/view/hud.lua`** — строки HUD и сообщения в `hud.gui`:
+
+- `hud.sync(self)`, `hud.flash(self)`
+
+Границы: `world.script` остаётся владельцем режимов, ввода, вызовов `core/` и ссылок `self.player`/`self.world`/`self.arena`; он только делегирует перечисленному выше. `core/` модули не меняются.
+
 ---
 
 ## 6. Правила расширения
@@ -216,7 +273,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 | 0 | Синхронизация документации под текущий факт | **Выполнено** (фаза 1: `ARCHITECTURE`, `AI_CODING_RULES`, `BALANCE`, `TESTING`, `ENGINE_DEFOLD`, `CONVENTIONS`, `PLAN`; `PLAN_14` удалён) |
 | 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка полноты палитры при старте | **Выполнено**; сборка 1.14.0, лог без ERROR, ручная игра |
 | 2 | Роль-палитра + `scripts/view/style.lua`; снятие `SYMBOL`/`FILL_KEY`/`INK_KEY` из `world.script`; проверка style → palette (§5.6) | **Выполнено**; сборка, ручная сверка вида клеток/врагов/игрока |
-| 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | ревью, поведение не меняется |
+| 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | **Выполнено** (§5.7); ревью, поведение не меняется |
 | 3a | Переименование `cell.go`/`cell.script` → `card.go`/`card.script` (правки ссылок в фабрике, `world.go`, `world.script`); вынос `scripts/view/fx.lua` | сборка, ручная игра |
 | 3b | Вынос `scripts/view/timeline.lua` (+ `card_anim`) | сборка, прогон боя, атак «в спину», арены |
 | 3c | Вынос `scripts/view/board.lua` (diff-синхронизация, идентичность карт, `content_row` арены) и `scripts/view/hud.lua`; `world.script` — тонкий координатор | сборка, ручная игра всех режимов |
