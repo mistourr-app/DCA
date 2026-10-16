@@ -65,6 +65,7 @@ DCA/
 │       ├── style.lua            view-registry: тип карты -> символ + роли палитры
 │       ├── fx.lua               эфемерные ГО: обводки, пунктир, угрозы, цифры
 │       ├── timeline.lua         раннер анимаций и ожидание anim_done
+│       ├── anim.lua             примитивы анимации ГО: lift/lunge/fall/flash
 │       ├── board.lua            ряды, diff-синхронизация карт, карты акторов
 │       └── hud.lua              строки HUD и сообщения в hud.gui
 ├── input/game.input_binding     привязки ввода (touch)

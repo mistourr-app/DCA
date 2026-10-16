@@ -76,7 +76,7 @@ collections/world.collection
 ### 3.3 Метрики
 
 - `collections/world.script` — 813 строк: ввод, маршрутизация режимов, вызовы `core/`, делегирование view-модулям, лагерь, смерть, сохранения.
-- Презентация вынесена в `scripts/view/`: `style.lua` (тип → символ + роли палитры), `fx.lua` (обводки, пунктир, угрозы, цифры), `timeline.lua` (раннер анимаций и `anim_done`), `board.lua` (ряды, diff-синхронизация карт, карты акторов), `hud.lua` (строки HUD). `world.script` — тонкий координатор.
+- Презентация вынесена в `scripts/view/`: `style.lua` (тип → символ + роли палитры), `fx.lua` (обводки, пунктир, угрозы, цифры), `timeline.lua` (раннер анимаций и `anim_done`), `anim.lua` (примитивы lift/lunge/fall/flash), `board.lua` (ряды, diff-синхронизация карт, карты акторов), `hud.lua` (строки HUD). `world.script` — тонкий координатор.
 - Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском.
 
 ---
@@ -236,9 +236,12 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 - `timeline.card_anim(self, id, name, payload)` — посылает карте и ждёт `anim_done` по `token`
 - `timeline.on_message(self, message)` — приём `anim_done` от карт (из `on_message` скрипта)
 
-**`scripts/view/anim.lua`** — примитивы анимации ГО, вызывает `card.script`:
+**`scripts/view/anim.lua`** — примитивы анимации ГО, вызывает `card.script` (абсолютные url компонентов):
 
-- `anim.lift(id, opts)`, `anim.lunge(id, opts)`, `anim.fall(id, opts)`, `anim.flash(id, opts)`
+- `anim.lift({ sprite, base, ms, scale })`
+- `anim.lunge({ root, offset, ms, done })`
+- `anim.fall({ root, sprite, label, offset, ms, color, done })`
+- `anim.flash({ sprite, from, to, ms, done })`
 
 **`scripts/view/hud.lua`** — строки HUD и сообщения в `hud.gui`:
 
@@ -280,7 +283,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 | 3b | Вынос `scripts/view/timeline.lua` (+ `card_anim`) | **Выполнено**; сборка, прогон боя, атак «в спину», арены |
 | 3c | Вынос `scripts/view/board.lua` (diff-синхронизация, идентичность карт, `content_row` арены) и `scripts/view/hud.lua`; `world.script` — тонкий координатор | **Выполнено**; сборка, ручная игра всех режимов |
 
-Порядок внутри 3 задан от менее связанного к более связанному (`fx` → `timeline` → `board`), чтобы не переписывать весь отлаженный таймлайн одним коммитом. `anim.lua` выносится вместе с `card.script` (3a). `cell` → `card` сделано в 3a: имя уже врёт (прототип универсальный), а ссылок мало. Палитра переходит между этапами 1 и 2: на этапе 1 `palette_cfg` переносит свойства под текущими именами (`color_*`), на этапе 2 они переименовываются в роли и подключается `style.lua` — так этап 1 не меняет картинку.
+Порядок внутри 3 задан от менее связанного к более связанному (`fx` → `timeline` → `board`), чтобы не переписывать весь отлаженный таймлайн одним коммитом. `anim.lua` вынесен отдельным коммитом после 3a (примитивы анимации — общий код для будущих прототипов; `card.script` собирает абсолютные url компонентов в `init`). `cell` → `card` сделано в 3a: имя уже врёт (прототип универсальный), а ссылок мало. Палитра переходит между этапами 1 и 2: на этапе 1 `palette_cfg` переносит свойства под текущими именами (`color_*`), на этапе 2 они переименовываются в роли и подключается `style.lua` — так этап 1 не меняет картинку.
 
 ---
 
