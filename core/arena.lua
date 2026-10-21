@@ -183,6 +183,22 @@ function M.shoot(a, weapon, damage, range)
 	return true, { { type = "shot", damage = damage, boss_hp = a.boss_hp } }
 end
 
+-- Срабатывание клетки под игроком: лечение или атака по боссу. Клетка становится пустой.
+-- Не меняет ход и не пересоздаёт клетку: вызывается и при шаге, и при входе на арену (GDD §12.4).
+function M.trigger_player_cell(a, x)
+	local cell = a.player_row[x] or { type = "EMPTY" }
+	if cell.type == "HEAL" then
+		a.player_hp = math.min(a.player_max, a.player_hp + balance.cells.HEAL.amount)
+		a.player_row[x] = { type = "EMPTY" }
+		return { { type = "heal", hp = a.player_hp } }
+	elseif cell.type == "ATTACK_CELL" then
+		a.player_row[x] = { type = "EMPTY" }
+		a.boss_hp = math.max(0, a.boss_hp - cell.damage)
+		return { { type = "player_attack", damage = cell.damage, boss_hp = a.boss_hp } }
+	end
+	return {}
+end
+
 -- Перемещение игрока по X на ряде арены: соседняя колонка — шаг, дальше — прыжок за HP.
 -- Передаёт ход боссу. Прыжок допустим, только если HP − стоимость ≥ 1 (GDD §5.1, §12.2).
 -- Клетка на ряду игрока: лечение применяется, клетка атаки наносит урон боссу (передача хода).
@@ -203,15 +219,8 @@ function M.player_move(a, x)
 	-- Перемещение или атака клеткой передают ход боссу (GDD §12.2).
 	a.turn = "boss"
 	local events = { { type = "player_move", x = x, cost = cost } }
-	local cell = a.player_row[x] or { type = "EMPTY" }
-	if cell.type == "HEAL" then
-		a.player_hp = math.min(a.player_max, a.player_hp + balance.cells.HEAL.amount)
-		a.player_row[x] = { type = "EMPTY" }
-		table.insert(events, { type = "heal", hp = a.player_hp })
-	elseif cell.type == "ATTACK_CELL" then
-		a.player_row[x] = { type = "EMPTY" }
-		a.boss_hp = math.max(0, a.boss_hp - cell.damage)
-		table.insert(events, { type = "player_attack", damage = cell.damage, boss_hp = a.boss_hp })
+	for _, event in ipairs(M.trigger_player_cell(a, x)) do
+		table.insert(events, event)
 	end
 	-- Уходя с клетки, игрок оставляет на её месте новую (GDD §12.4).
 	a.player_row[from] = M.reroll_player_cell(a)

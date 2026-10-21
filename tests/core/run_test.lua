@@ -34,6 +34,26 @@ M["free step moves the player and costs no hp"] = function(t)
 	t.true_(has(events, "move") ~= nil, "есть событие move")
 end
 
+M["arena entry keeps behind attacks but skips destination and equipment"] = function(t)
+	local rows = {
+		[0] = { [4] = { type = "ENEMY", enemy = "TYPE_1" } },
+		[1] = { [2] = { type = "GOLD" } },
+	}
+	local r = make(rows, 20)
+	r.player.weapon.fired_this_row = true
+	r.player.weapon.recharge_left = 2
+	local ok, events = run.step(r, 2, 1, { arena_entry = true })
+	t.true_(ok, "move is allowed")
+	t.equal(r.world.pos.y, 1, "player moves to the arena row")
+	t.equal(r.player.hp, 16, "behind attack still happens")
+	t.equal(r.player.gold, 0, "destination gold is not collected")
+	t.equal(r.get_row(1)[2].type, "GOLD", "destination card is not consumed")
+	t.true_(has(events, "behind_attack") ~= nil, "behind attack event is returned")
+	t.true_(has(events, "gold") == nil, "destination event is not returned")
+	t.true_(r.player.weapon.fired_this_row, "weapon row flag is left for enter_arena")
+	t.equal(r.player.weapon.recharge_left, 2, "weapon recharge is not ticked")
+end
+
 M["jump costs hp max(0, |dx|-1)"] = function(t)
 	local r = make({ [1] = { [4] = { type = "EMPTY" } } }, 10)
 	local ok = run.step(r, 4, 1)

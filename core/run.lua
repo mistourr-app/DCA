@@ -92,7 +92,9 @@ end
 
 -- Один ход игрока на клетку (x, y) следующего ряда.
 -- Возвращает ok, events. При отказе ok = false, а состояние не меняется.
-function M.step(run, x, y)
+-- opts.arena_entry пропускает взаимодействие с клеткой назначения и сброс/тик оружия:
+-- это делает enter_arena после перехода (превью уже сгенерировано).
+function M.step(run, x, y, opts)
 	local w = run.world
 	local pos = w.pos
 	local row_above = run.get_row(pos.y + 1)
@@ -124,15 +126,21 @@ function M.step(run, x, y)
 	table.insert(events, { type = "move", from = pos, to = { x = x, y = y }, cost = cost })
 
 	-- [5] взаимодействие с клеткой
-	-- Отсутствующая клетка (например, ряд арены без клеток) считается пустой.
-	local cell = (run.get_row(y) or {})[x] or { type = "EMPTY" }
-	for _, e in ipairs(interact(run, cell, x, y)) do
-		table.insert(events, e)
+	-- При входе на арену стартовую клетку обрабатывает arena.trigger_player_cell.
+	if not (opts and opts.arena_entry) then
+		-- Отсутствующая клетка (например, ряд арены без клеток) считается пустой.
+		local cell = (run.get_row(y) or {})[x] or { type = "EMPTY" }
+		for _, e in ipairs(interact(run, cell, x, y)) do
+			table.insert(events, e)
+		end
 	end
 
 	-- [6] ход завершён
-	equipment.new_row(run.player.weapon)
-	equipment.tick(run.player.weapon)
+	-- При входе на арену новый ряд и оружие настраивает enter_arena.
+	if not (opts and opts.arena_entry) then
+		equipment.new_row(run.player.weapon)
+		equipment.tick(run.player.weapon)
+	end
 	return true, events
 end
 

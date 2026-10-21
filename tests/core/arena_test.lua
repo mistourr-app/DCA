@@ -70,6 +70,25 @@ M["attack cell damage stays in the configured range"] = function(t)
 	end
 end
 
+M["entering arena triggers the card under the player"] = function(t)
+	local heal = new_fight(10, 20)
+	heal.player_x = 3
+	heal.player_row[3] = { type = "HEAL" }
+	local heal_events = arena.trigger_player_cell(heal, 3)
+	t.equal(heal.player_hp, 10 + balance.cells.HEAL.amount, "heal is applied on entry")
+	t.equal(heal.player_row[3].type, "EMPTY", "heal is consumed on entry")
+	t.equal(heal_events[1].type, "heal", "heal event is returned")
+
+	local attack = new_fight(20, 20)
+	attack.player_x = 3
+	attack.player_row[3] = { type = "ATTACK_CELL", damage = 7 }
+	local boss_before = attack.boss_hp
+	local attack_events = arena.trigger_player_cell(attack, 3)
+	t.equal(attack.boss_hp, boss_before - 7, "attack damages the boss on entry")
+	t.equal(attack.player_row[3].type, "EMPTY", "attack is consumed on entry")
+	t.equal(attack_events[1].type, "player_attack", "attack event is returned")
+end
+
 M["shot does not end the turn and is allowed once"] = function(t)
 	local a = new_fight(20, 20)
 	local w = equipment.new(3, 5)

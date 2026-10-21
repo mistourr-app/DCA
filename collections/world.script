@@ -455,6 +455,36 @@ local function steps_arena(self, from_x, from_y, mid_x, boss_from_x, boss_to_x, 
 	return steps
 end
 
+-- Эффект стартовой клетки при входе на арену: показывается после слайда игрока.
+local function steps_arena_entry(self, x, y, events)
+	local steps = {}
+	local pattack, heal
+	for _, e in ipairs(events) do
+		if e.type == "player_attack" then
+			pattack = e
+		elseif e.type == "heal" then
+			heal = e
+		end
+	end
+	if pattack ~= nil then
+		local boss_x = self.arena.boss_x
+		table.insert(steps, timeline.card_anim(self, self.player_go, "lunge", {
+			offset = board.lunge_offset(x, y, boss_x, y + 1, 0.55),
+		}))
+		table.insert(steps, function(next)
+			fx.popup(self, boss_x, y + 1, "-" .. pattack.damage, "damage", 0)
+			next()
+		end)
+	end
+	if heal ~= nil then
+		table.insert(steps, function(next)
+			fx.popup(self, x, y, "+" .. balance.cells.HEAL.amount, "heal", 0)
+			next()
+		end)
+	end
+	return steps
+end
+
 -- Арена: выстрел по боссу — вспышка его карты и цифры; победа — прыжок на чекпоинт.
 local function steps_arena_shot(self, boss_x, row, shot, won, win_target)
 	local steps = {}
@@ -584,8 +614,11 @@ local function enter_arena(self)
 	-- Сбрасываем при входе, чтобы выстрел был доступен с первого хода боя (GDD §12.2).
 	equipment.new_row(self.player.weapon)
 	world.transition(self.world, MODES.BOSS)
+	local entry_events = arena.trigger_player_cell(a, a.player_x)
+	self.player.hp = a.player_hp
 	local boss_number = (pos.y + ARENA_ROWS) / PERIOD
 	print("arena " .. boss_number .. " started at row " .. pos.y)
+	return entry_events
 end
 
 -- Исход боя: победа — чекпоинт выше арены, поражение — смерть.
@@ -678,21 +711,39 @@ end
 local function world_action(self, action_type, x, row)
 	local from_x = self.world.pos.x
 	local from_y = self.world.pos.y
-	-- Шаг на нижний ряд арены: игрок встаёт на него и входит в бой. Обычные клетки там не используются.
+	-- Шаг на нижний ряд арены: обычный ход (включая атаки в спину), но клетку входа
+	-- обрабатывает арена, а не interact мира.
 	if action_type == "step" and is_arena_bottom(row) then
-		local moved, reason = world.move(self.world, { x = x, y = row })
-		if not moved then
-			print("refused: " .. tostring(reason))
+		local ok, events = run.step(self.run, x, row, { arena_entry = true })
+		apply_events(self, events)
+		if not ok then
 			return
 		end
-		self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
-		enter_arena(self)
-		timeline.play(self, { slide_step(self, from_x, from_y, x, row) }, function()
+		local moved = has_event(events, "move")
+		local entry_events
+		if moved then
+			self.player.gold, _ = camp.tick_payment(self.camp_state, self.player.gold)
+			entry_events = enter_arena(self)
+		end
+		local steps = {}
+		if ok then
+			steps = steps_step(self, from_x, from_y, events)
+		end
+		if entry_events ~= nil then
+			for _, step in ipairs(steps_arena_entry(self, x, row, entry_events)) do
+				table.insert(steps, step)
+			end
+		end
+		if #steps == 0 then
 			finish_view(self)
-		end)
+		else
+			timeline.play(self, steps, function()
+				finish_view(self)
+			end)
+		end
 		return
 	end
-	local ok, events
+	local ok, events, entry_events
 	if action_type == "step" then
 		ok, events = run.step(self.run, x, row)
 	elseif action_type == "melee" then
@@ -710,7 +761,7 @@ local function world_action(self, action_type, x, row)
 			save(self)
 		end
 		if is_arena_bottom(pos.y) then
-			enter_arena(self)
+			entry_events = enter_arena(self)
 		end
 	end
 	local steps = {}
@@ -721,6 +772,11 @@ local function world_action(self, action_type, x, row)
 			steps = steps_step(self, from_x, from_y, events)
 		else
 			steps = steps_shoot(self, x, events)
+		end
+	end
+	if entry_events ~= nil then
+		for _, step in ipairs(steps_arena_entry(self, x, row, entry_events)) do
+			table.insert(steps, step)
 		end
 	end
 	if #steps == 0 then
