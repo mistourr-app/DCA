@@ -33,6 +33,19 @@ local M = {}
 local COLUMNS = balance.board.columns
 local LOW = balance.arena.hpLowThreshold
 local HIGH = balance.arena.hpHighThreshold
+local PERIOD = balance.boss.period
+local ARENA_ROWS = balance.boss.arenaRows
+
+-- Нижний ряд арены для любого из её двух рядов; nil для обычного ряда и checkpoint.
+-- Арена занимает последние ARENA_ROWS рядов периода (GDD §12.1).
+function M.arena_bottom_for_row(row)
+	local phase = row % PERIOD
+	local bottom_phase = PERIOD - ARENA_ROWS
+	if phase < bottom_phase then
+		return nil
+	end
+	return row - phase + bottom_phase
+end
 
 -- Множитель HP босса по номеру босса (1, 2, ...), из CSV.
 function M.boss_max_hp(player_max_hp, boss_number)

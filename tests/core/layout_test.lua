@@ -104,6 +104,38 @@ M["tap between normal and tall rows resolves correctly"] = function(t)
 	t.equal(r2, pr + 2, "второй высокий ряд (частично видимый)")
 end
 
+M["screen_fit keeps the design aspect in any window"] = function(t)
+	local cases = {
+		{ 720, 1560, 1, 0, 0 },
+		{ 1080, 2400, 1.5, 0, 30 },
+		{ 1920, 1080, 0.69230769230769, 710.76923076923, 0 },
+	}
+	for _, c in ipairs(cases) do
+		local fit = layout.screen_fit(c[1], c[2])
+		t.true_(fit ~= nil, "fit для " .. c[1] .. "x" .. c[2])
+		t.true_(math.abs(fit.scale - c[3]) < 0.000001, "масштаб " .. c[1] .. "x" .. c[2])
+		t.true_(math.abs(fit.left - c[4]) < 0.000001, "левый край " .. c[1] .. "x" .. c[2])
+		t.true_(math.abs(fit.bottom - c[5]) < 0.000001, "нижний край " .. c[1] .. "x" .. c[2])
+		t.true_(fit.width <= c[1] and fit.height <= c[2], "контент помещается")
+	end
+end
+
+M["screen_fit respects the safe area"] = function(t)
+	local fit = layout.screen_fit(1080, 2400, { x = 10, y = 50, width = 1060, height = 2250 })
+	t.true_(fit.left >= 10 and fit.bottom >= 50, "контент внутри safe area")
+	t.true_(fit.left + fit.width <= 1070, "правый край внутри safe area")
+	t.true_(fit.bottom + fit.height <= 2300, "верхний край внутри safe area")
+end
+
+M["screen_to_design inverts screen_fit"] = function(t)
+	local fit = layout.screen_fit(1080, 2400)
+	local x, y = layout.screen_to_design(fit.left + 360 * fit.scale, fit.bottom + 780 * fit.scale, fit)
+	t.true_(math.abs(x - 360) < 0.000001, "центр по x")
+	t.true_(math.abs(y - 780) < 0.000001, "центр по y")
+	t.equal(layout.screen_to_design(fit.left - 1, fit.bottom + 10, fit), nil, "поле слева")
+	t.equal(layout.screen_to_design(fit.left + 10, fit.bottom - 1, fit), nil, "поле снизу")
+end
+
 M["taps outside the field return nil"] = function(t)
 	t.equal(layout.cell_at(-1, layout.MARGIN_BOTTOM + 10, 0), nil, "левее поля")
 	t.equal(layout.cell_at(layout.WIDTH, layout.MARGIN_BOTTOM + 10, 0), nil, "правее поля")

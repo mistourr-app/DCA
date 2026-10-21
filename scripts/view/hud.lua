@@ -7,7 +7,7 @@ local MODES = world.MODES
 
 local M = {}
 
--- Текст HUD и кнопки внизу экрана.
+-- Текст HUD, кнопки внизу экрана и зарезервированные строки туториала (self.hint).
 function M.sync(self)
 	local p = self.player
 	local pos = self.world.pos
@@ -29,6 +29,7 @@ function M.sync(self)
 	msg.post("#hud", "update", {
 		top = top,
 		bottom = bottom,
+		hint = self.hint,
 		overlay = self.world.mode == MODES.DEATH,
 	})
 end

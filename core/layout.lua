@@ -1,5 +1,5 @@
 -- Геометрия экрана: клетки поля <-> логические координаты (GDD §2, docs/ARCHITECTURE.md §7).
--- Чистая логика. Логическое разрешение 720x1280 (design/design.csv, раздел screen.*),
+-- Чистая логика. Логическое разрешение 720x1560 (design/design.csv, раздел screen.*),
 -- начало координат снизу слева.
 --
 -- Поле — контейнер рядов: клетки живут в «пространстве рядов» (координата вверх по номеру
@@ -84,6 +84,57 @@ function M.visible_rows(player_row)
 		y = y + 1
 	end
 	return out
+end
+
+-- Вписывание логического экрана в окно с сохранением пропорций и safe area.
+-- safe_area — таблица window.get_safe_area() (x, y, width, height) или nil.
+-- Возвращает масштаб и прямоугольник контента в координатах окна (снизу слева).
+function M.screen_fit(window_w, window_h, safe_area)
+	if type(window_w) ~= "number" or type(window_h) ~= "number" then
+		return nil
+	end
+	if window_w <= 0 or window_h <= 0 then
+		return nil
+	end
+	local x, y, w, h = 0, 0, window_w, window_h
+	if type(safe_area) == "table" and safe_area.width and safe_area.height then
+		local sx = safe_area.x or 0
+		local sy = safe_area.y or 0
+		local sw = safe_area.width
+		local sh = safe_area.height
+		if sw > 0 and sh > 0 then
+			x = math.max(0, sx)
+			y = math.max(0, sy)
+			w = math.min(sw, window_w - x)
+			h = math.min(sh, window_h - y)
+		end
+	end
+	if w <= 0 or h <= 0 then
+		x, y, w, h = 0, 0, window_w, window_h
+	end
+	local scale = math.min(w / M.WIDTH, h / M.HEIGHT)
+	local width = M.WIDTH * scale
+	local height = M.HEIGHT * scale
+	return {
+		scale = scale,
+		left = x + (w - width) / 2,
+		bottom = y + (h - height) / 2,
+		width = width,
+		height = height,
+	}
+end
+
+-- Точка окна -> логические координаты. nil, если точка вне вписанного экрана.
+function M.screen_to_design(px, py, fit)
+	if fit == nil or fit.scale <= 0 then
+		return nil
+	end
+	local x = (px - fit.left) / fit.scale
+	local y = (py - fit.bottom) / fit.scale
+	if x < 0 or x >= M.WIDTH or y < 0 or y >= M.HEIGHT then
+		return nil
+	end
+	return x, y
 end
 
 -- Клетка под точкой (px, py) при игроке на ряду player_row.

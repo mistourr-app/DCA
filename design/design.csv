@@ -7,11 +7,11 @@
 # Правило: docs/AI_CODING_RULES.md, раздел "источники чисел".
 # Формат: path,value,notes. Генерация: python tools/build_balance.py -> core/data/design.lua.
 
-# --- Screen (logical pixels, portrait 720x1280) ---
+# --- Screen (logical pixels, portrait 720x1560, 19.5:9) ---
 screen.width,720,logical width
-screen.height,1280,logical height
+screen.height,1560,logical height
 screen.visibleRows,4,rows shown: current row plus rows ahead; the rest is fog of war (GDD 5)
-screen.marginTop,100,space above the field for HUD
+screen.marginTop,180,space above the field for HUD and two lines of tutorial text
 screen.marginBottom,120,space below the field for the camp button
 screen.arenaRowScale,2,height of one arena row relative to a normal row; the two arena rows fill the field
 screen.threatAlpha,0.25,opacity of the threat overlay per enemy seeing the cell, capped at 1 (GDD 5.4)

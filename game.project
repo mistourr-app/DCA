@@ -4,6 +4,7 @@ version = 0.1.0
 
 [bootstrap]
 main_collection = /collections/world.collectionc
+render = /render/game.renderc
 
 [render]
 clear_color_red = 0.035
@@ -13,7 +14,7 @@ clear_color_alpha = 1.0
 
 [display]
 width = 720
-height = 1280
+height = 1560
 high_dpi = 1
 dynamic_orientation = 0
 update_frequency = 60

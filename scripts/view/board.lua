@@ -32,10 +32,18 @@ function M.get_row(self, y)
 	return cells
 end
 
--- Источник содержимого ряда на экране: в бою ряды берутся из состояния арены,
--- остальные — из генератора (ряды типа boss без боя пусты).
+-- Источник содержимого ряда на экране: ряды арены берутся из preview/боя, остальные —
+-- из генератора (ряды типа boss без preview пусты).
 function M.content_row(self, y)
 	local a = self.arena
+	if a ~= nil and self.arena_bottom ~= nil then
+		if y == self.arena_bottom then
+			return a.player_row
+		end
+		if y == self.arena_bottom + 1 then
+			return a.boss_row
+		end
+	end
 	if self.world.mode == MODES.BOSS and a ~= nil then
 		local pr = self.world.pos.y
 		if y == pr then
@@ -107,6 +115,26 @@ function M.lunge_offset(x0, y0, x1, y1, fraction)
 	return vmath.vector3(dx * fraction, dy * fraction, 0)
 end
 
+-- Создать карты ряда y заранее, до анимации прокрутки: тогда ряд въезжает из-под
+-- фейда, а не появляется в конце хода. В бою ряды арены уже созданы sync_cells.
+function M.ensure_row(self, y)
+	if y < 0 or self.cards[y] ~= nil or self.world.mode == MODES.BOSS then
+		return
+	end
+	local row = M.content_row(self, y)
+	local out = {}
+	for x = 0, layout.COLUMNS - 1 do
+		local cell = (row and row[x]) or { type = "EMPTY" }
+		local id = M.create(self, x, y, Z_CELL)
+		if id ~= nil then
+			local text, fill, ink = M.cell_view(self, cell)
+			msg.post(id, "set", M.card_msg(self, x, y, text, fill, ink))
+			out[x] = { id = id, sig = M.cell_sig(cell) }
+		end
+	end
+	self.cards[y] = out
+end
+
 -- Diff-синхронизация видимых клеток: создаём новые, обновляем изменившиеся,
 -- удаляем вышедшие из окна. Ряды ниже игрока не видны и не хранятся как объекты.
 -- Смена содержимого сбрасывает позицию карты: анимации (fall/lunge) могли её сместить.
@@ -176,17 +204,27 @@ function M.sync_player(self, pr)
 		M.card_msg(self, pos.x, pr, view.symbol, self.pal[view.fill], self.pal[view.ink]))
 end
 
--- Карта босса: отдельный объект на верхнем ряду арены; создаётся в бою, удаляется по его концу.
+-- Карта босса: отдельный объект на верхнем ряду арены. Показывается уже в preview,
+-- как только ряд босса попал в видимое окно; удаляется по концу боя.
 function M.sync_boss(self, pr)
 	local a = self.arena
-	if self.world.mode ~= MODES.BOSS or a == nil then
+	local boss_y = self.arena_bottom and self.arena_bottom + 1 or nil
+	local visible = false
+	if boss_y ~= nil then
+		for _, y in ipairs(layout.visible_rows(pr)) do
+			if y == boss_y then
+				visible = true
+				break
+			end
+		end
+	end
+	if a == nil or boss_y == nil or not visible then
 		if self.boss_go ~= nil then
 			go.delete(self.boss_go)
 			self.boss_go = nil
 		end
 		return
 	end
-	local boss_y = pr + 1
 	if self.boss_go == nil then
 		self.boss_go = M.create(self, a.boss_x, boss_y, Z_ACTOR)
 	end

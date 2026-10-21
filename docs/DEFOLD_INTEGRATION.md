@@ -69,7 +69,7 @@ collections/world.collection
 | `game_objects/palette_cfg.script` | 16 | роль-палитра: `fill_neutral`/`fill_wall`/`fill_good`/`fill_gold`/`fill_danger`/`fill_attack`/`fill_camp`/`fill_player`, `ink_dark`/`ink_light`, `outline_step`/`outline_jump`/`outline_attack`, `dot`/`vision`/`spotted` |
 | `game_objects/card.script` | 5 | `lift_scale`, `lunge_ms`, `fall_ms`, `flash_ms`, `flash_color` |
 | `game_objects/popup.script` | 5 | `float_ms`, `float_rise`, `color_damage`, `color_heal`, `color_gold` |
-| `gui/hud.gui_script` | 0 | невозможно; параметры вспышки приходят сообщением `flash` |
+| `gui/hud.gui_script` | 0 | невозможно; параметры вспышки приходят сообщением `flash`; динамические текстуры фейдов создаются в `init` |
 
 `world.script` читает конфиги через `go.get("#geom_cfg", ...)` и держит значения в `self` (`read_config`), проверяя при старте полноту палитры (`check_palette`).
 
@@ -206,7 +206,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 **`scripts/view/board.lua`** — раскладка, окно рядов, diff-синхронизация карт:
 
 - `board.get_row(self, y) -> cells | nil`
-- `board.content_row(self, y) -> cells` (в бою ряды берутся из арены)
+- `board.content_row(self, y) -> cells` (ряды арены берутся из preview/боя)
 - `board.cell_sig(cell) -> string`
 - `board.cell_view(self, cell) -> text, fill, ink` (символ/роли через `style`, буква врага — из реестра)
 - `board.card_msg(self, x, y, text, fill, ink) -> table`
@@ -245,7 +245,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 
 **`scripts/view/hud.lua`** — строки HUD и сообщения в `hud.gui`:
 
-- `hud.sync(self)`, `hud.flash(self)`
+- `hud.sync(self)` — строки HUD и `hint` (две строки туториала), `hud.flash(self)`
 
 Границы: `world.script` остаётся владельцем режимов, ввода, вызовов `core/` и ссылок `self.player`/`self.world`/`self.arena`; он только делегирует перечисленному выше. `core/` модули не меняются.
 

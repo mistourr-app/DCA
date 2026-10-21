@@ -123,11 +123,37 @@ local PERIOD = balance.boss.period
 local ARENA_ROWS = balance.boss.arenaRows
 
 local function is_arena_bottom(y)
-	return row_gen.kind(y) == "boss" and (y % PERIOD) == (PERIOD - ARENA_ROWS)
+	return arena.arena_bottom_for_row(y) == y
+end
+
+-- Состояние боя создаётся заранее, как только любой ряд арены появился в поле зрения.
+-- Карты при этом уже лежат на обоих рядах, а босс виден на своей колонке ещё до входа.
+local function create_arena(self, bottom)
+	local boss_number = (bottom + ARENA_ROWS) / PERIOD
+	local g = rng.new(row_seed.row_seed(self.seed, self.world.respawn_count, bottom))
+	local frac = self.player.hp / self.player.max_hp
+	local pr, br = arena.generate_rows(g, arena.player_row_chances(frac))
+	self.arena = arena.new(self.world.pos.x, self.player.hp, self.player.max_hp,
+		boss_number, pr, br, g)
+	self.arena_bottom = bottom
+end
+
+local function ensure_arena_preview(self)
+	if self.arena ~= nil or self.world.mode ~= MODES.WORLD then
+		return
+	end
+	for _, y in ipairs(layout.visible_rows(self.world.pos.y)) do
+		local bottom = arena.arena_bottom_for_row(y)
+		if bottom ~= nil then
+			create_arena(self, bottom)
+			return
+		end
+	end
 end
 
 -- Перерисовка: доска (контейнер, карты, акторы, очистка fx), затем подсветки поверх.
 local function refresh(self)
+	ensure_arena_preview(self)
 	local pr = self.world.pos.y
 	board.refresh(self)
 	-- Слой угроз: поверх клеток, под персонажами и содержимым (GDD §5.4).
@@ -190,6 +216,11 @@ local function play_move(self, from_x, from_y, to_x, to_y, done)
 		return
 	end
 	local move_s = self.move_ms / 1000
+	-- Новые ряды создаём до прокрутки, чтобы они выезжали из-под фейдов.
+	ensure_arena_preview(self)
+	for _, y in ipairs(layout.visible_rows(to_y)) do
+		board.ensure_row(self, y)
+	end
 	go.cancel_animations(self.player_go, "position")
 	go.cancel_animations(self.rows_id, "position")
 	go.set(self.player_go, "position",
@@ -472,6 +503,8 @@ local function apply_events(self, events)
 	for _, e in ipairs(events) do
 		if e.type == "death" then
 			print("DEATH at row " .. self.world.pos.y)
+			self.arena = nil
+			self.arena_bottom = nil
 			world.transition(self.world, MODES.DEATH)
 		elseif e.type == "refused" then
 			print("refused: " .. e.reason)
@@ -487,6 +520,8 @@ local function respawn(self)
 	end
 	self.player = player
 	self.run.player = player
+	self.arena = nil
+	self.arena_bottom = nil
 	world.respawn(self.world)
 	-- Ряды выше точки возврата генерируются заново с новым respawn_count (GDD §11).
 	local rp_row = self.world.return_point.row
@@ -531,18 +566,25 @@ local function leave_camp(self)
 	hud.sync(self)
 end
 
--- Вход на арену: создаётся состояние боя, ряды арены генерируются по seed этого ряда.
+-- Вход на арену: preview уже создан при появлении арены в поле зрения; здесь он
+-- актуализируется по текущей позиции и HP игрока. Если preview не было — создаём.
 local function enter_arena(self)
 	local pos = self.world.pos
-	local boss_number = (pos.y + ARENA_ROWS) / PERIOD
-	local g = rng.new(row_seed.row_seed(self.seed, self.world.respawn_count, pos.y))
-	local frac = self.player.hp / self.player.max_hp
-	local pr, br = arena.generate_rows(g, arena.player_row_chances(frac))
-	self.arena = arena.new(pos.x, self.player.hp, self.player.max_hp, boss_number, pr, br, g)
+	if self.arena == nil or self.arena_bottom ~= pos.y then
+		create_arena(self, pos.y)
+	end
+	local a = self.arena
+	a.player_x = pos.x
+	a.player_hp = self.player.hp
+	a.player_max = self.player.max_hp
+	a.turn = "player"
+	a.prev_boss_x = nil
+	a.fired = false
 	-- Флаг «уже стрелял на ряду» — механика мира; в арене свой лимит (a.fired).
 	-- Сбрасываем при входе, чтобы выстрел был доступен с первого хода боя (GDD §12.2).
 	equipment.new_row(self.player.weapon)
 	world.transition(self.world, MODES.BOSS)
+	local boss_number = (pos.y + ARENA_ROWS) / PERIOD
 	print("arena " .. boss_number .. " started at row " .. pos.y)
 end
 
@@ -552,11 +594,13 @@ local function arena_outcome(self)
 	if res == "victory" then
 		world.boss_victory(self.world)
 		self.arena = nil
+		self.arena_bottom = nil
 		print("boss defeated, checkpoint at row " .. self.world.pos.y)
 		save(self)
 	elseif res == "defeat" then
 		self.player.hp = 0
 		self.arena = nil
+		self.arena_bottom = nil
 		world.transition(self.world, MODES.DEATH)
 		print("defeated by boss")
 	end
@@ -712,6 +756,8 @@ function init(self)
 	self.anim_token = 0
 	self.player_go = nil
 	self.boss_go = nil
+	self.arena = nil
+	self.arena_bottom = nil
 	self.world = world.new(self.seed, 0)
 	if found then
 		local rp = data.return_point
@@ -765,6 +811,20 @@ function final(self)
 	save(self)
 end
 
+local function design_point(px, py)
+	local ok_size, width, height = pcall(window.get_size)
+	if not ok_size or type(width) ~= "number" or type(height) ~= "number" then
+		return nil
+	end
+	local safe = nil
+	local ok_safe, area = pcall(window.get_safe_area)
+	if ok_safe and type(area) == "table" then
+		safe = area
+	end
+	local fit = layout.screen_fit(width, height, safe)
+	return layout.screen_to_design(px, py, fit)
+end
+
 function on_input(self, action_id, action)
 	if action_id ~= hash("touch") or not action.pressed then
 		return false
@@ -777,7 +837,13 @@ function on_input(self, action_id, action)
 		respawn(self)
 		return true
 	end
-	if action.y < BUTTON_HEIGHT then
+	-- action.x/y уже растянуты в виртуальные 720x1560; для content-fit нужны
+	-- реальные координаты окна, иначе тап смещается по вертикали/горизонтали.
+	local px, py = design_point(action.screen_x, action.screen_y)
+	if px == nil then
+		return true
+	end
+	if py < BUTTON_HEIGHT then
 		if mode == MODES.WORLD then
 			make_camp(self)
 		elseif mode == MODES.CAMP then
@@ -785,7 +851,7 @@ function on_input(self, action_id, action)
 		end
 		return true
 	end
-	local x, row = layout.cell_at(action.x, action.y, self.world.pos.y)
+	local x, row = layout.cell_at(px, py, self.world.pos.y)
 	if x == nil then
 		return true
 	end

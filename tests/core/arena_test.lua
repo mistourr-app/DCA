@@ -27,6 +27,14 @@ M["boss hp is player max hp times the configured multiplier"] = function(t)
 	t.true_(arena.boss_max_hp(20, 2) > arena.boss_max_hp(20, 1), "второй босс сильнее")
 end
 
+M["both arena rows resolve to one arena bottom row"] = function(t)
+	local bottom = balance.boss.period - balance.boss.arenaRows
+	t.equal(arena.arena_bottom_for_row(bottom), bottom, "нижний ряд арены")
+	t.equal(arena.arena_bottom_for_row(bottom + 1), bottom, "верхний ряд арены")
+	t.equal(arena.arena_bottom_for_row(bottom - 1), nil, "обычный ряд перед ареной")
+	t.equal(arena.arena_bottom_for_row(0), nil, "стартовый checkpoint")
+end
+
 M["player row chances follow hp fraction thresholds"] = function(t)
 	local low = arena.player_row_chances(0.2)
 	local high = arena.player_row_chances(0.9)

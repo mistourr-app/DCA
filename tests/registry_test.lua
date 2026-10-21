@@ -127,9 +127,10 @@ M["rows chance sums do not exceed 1"] = function(t)
 	end
 end
 
-M["layout is portrait 720x1280 with 5 columns"] = function(t)
+M["layout is portrait 720x1560 with 5 columns"] = function(t)
 	t.equal(design.screen.width, 720, "ширина")
-	t.equal(design.screen.height, 1280, "высота")
+	t.equal(design.screen.height, 1560, "высота")
+	t.equal(design.screen.marginTop, 180, "верхний отступ")
 	t.equal(balance.board.columns, 5, "колонки")
 end
 

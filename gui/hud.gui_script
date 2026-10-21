@@ -5,6 +5,32 @@
 -- Сигнатура gui.animate: (node, property, to, easing, duration, delay, complete_function,
 -- playback) — отличается от go.animate: нет playback на 3-м месте.
 
+-- Фейды — два box-узла с динамической RGBA-текстурой: чёрный с вертикальной
+-- альфой. Текстура создаётся один раз в init; ассеты не нужны.
+local FADE_STEPS = 256
+
+local function fade_buffer(alpha_from, alpha_to)
+	local rows = {}
+	for i = 0, FADE_STEPS - 1 do
+		local t = i / (FADE_STEPS - 1)
+		local alpha = math.floor(alpha_from + (alpha_to - alpha_from) * t + 0.5)
+		rows[i + 1] = string.char(0, 0, 0, alpha)
+	end
+	return table.concat(rows)
+end
+
+local function make_fade(texture_id, node_id, alpha_from, alpha_to)
+	local node = gui.get_node(node_id)
+	local ok, reason = gui.new_texture(texture_id, 1, FADE_STEPS, "rgba",
+		fade_buffer(alpha_from, alpha_to), false)
+	if ok or reason == gui.RESULT_TEXTURE_ALREADY_EXISTS then
+		gui.set_texture(node, texture_id)
+	else
+		gui.set_enabled(node, false)
+		print("fade texture create failed: " .. texture_id)
+	end
+end
+
 local function set_overlay(visible)
 	gui.set_enabled(gui.get_node("overlay"), visible)
 	gui.set_enabled(gui.get_node("overlay_title"), visible)
@@ -12,20 +38,29 @@ local function set_overlay(visible)
 end
 
 function init(self)
+	make_fade("fade_top", "fade_top", 255, 0)
+	make_fade("fade_bottom", "fade_bottom", 0, 255)
+	local flash = gui.get_node("flash")
+	gui.set_color(flash, vmath.vector4(1, 0.05, 0.05, 0))
+	gui.set_enabled(flash, false)
 	set_overlay(false)
 end
 
--- "update": message.top, message.bottom — строки; message.overlay — показывать ли экран смерти.
+-- "update": message.top, message.bottom, message.hint — строки; message.overlay — показывать ли экран смерти.
 -- "flash": message.color (vector4), message.alpha, message.duration (сек) —
 -- красная вспышка на весь экран, гаснет за duration.
 function on_message(self, message_id, message, sender)
 	if message_id == hash("update") then
 		gui.set_text(gui.get_node("top"), message.top)
 		gui.set_text(gui.get_node("bottom"), message.bottom)
+		if message.hint ~= nil then
+			gui.set_text(gui.get_node("hint"), message.hint)
+		end
 		set_overlay(message.overlay)
 	elseif message_id == hash("flash") then
 		local node = gui.get_node("flash")
 		local color = message.color
+		gui.set_enabled(node, true)
 		gui.cancel_animations(node, "color")
 		gui.set_color(node, vmath.vector4(color.x, color.y, color.z, message.alpha))
 		gui.animate(node, "color", vmath.vector4(color.x, color.y, color.z, 0),
