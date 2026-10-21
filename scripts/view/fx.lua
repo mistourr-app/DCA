@@ -7,8 +7,9 @@ local highlight = require("core.highlight")
 local BAR_URL = "#bar_factory"
 local POPUP_URL = "#popup_factory"
 
--- Слои (position.z): под картами-акторами (0.3), поверх клеток. Карта слоёв — в world.script.
-local Z_OUTLINE = 0.6
+-- Слои (position.z): обводки под картами-акторами (0.3) и поверх подписей клеток (0.2).
+-- Карта слоёв — в world.script.
+local Z_OUTLINE = 0.25
 local Z_DASH = 0.7
 local Z_POPUP = 0.8
 

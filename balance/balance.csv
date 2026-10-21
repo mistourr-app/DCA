@@ -63,12 +63,12 @@ boss.hpMultiplier.slope,0.1,ВРЕМЕННОЕ: growth per boss (PLAN.md, пун
 # --- Arena (snapshot from DR, no ammo, no bonuses) ---
 arena.hpLowThreshold,0.5,
 arena.hpHighThreshold,0.75,
-arena.chances.ATTACK_CELL.base,0.20,
-arena.chances.ATTACK_CELL.hpLow,0.10,
-arena.chances.ATTACK_CELL.hpHigh,0.30,
-arena.chances.HEAL.base,0.25,
-arena.chances.HEAL.hpLow,0.35,
-arena.chances.HEAL.hpHigh,0.15,
+arena.chances.ATTACK_CELL.base,0.40,
+arena.chances.ATTACK_CELL.hpLow,0.20,
+arena.chances.ATTACK_CELL.hpHigh,0.50,
+arena.chances.HEAL.base,0.30,
+arena.chances.HEAL.hpLow,0.50,
+arena.chances.HEAL.hpHigh,0.20,
 
 # --- Camp ---
 camp.pricePercent,10,ВРЕМЕННОЕ: percent of current gold to set up camp (GDD 8.1) (PLAN.md, пункт 17)

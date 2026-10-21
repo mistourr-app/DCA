@@ -44,6 +44,15 @@ M["player row chances follow hp fraction thresholds"] = function(t)
 	t.equal(mid.HEAL, balance.arena.chances.HEAL.base, "середина — базовый шанс")
 end
 
+M["arena rows keep empty cells rare"] = function(t)
+	for _, fraction in ipairs({ 0.2, 0.6, 0.9 }) do
+		local ch = arena.player_row_chances(fraction)
+		local content = ch.ATTACK_CELL + ch.HEAL
+		t.true_(content >= 0.7 - 1e-9, "player row content chance is at least 70%")
+	end
+	t.true_(balance.arena.chances.ATTACK_CELL.base >= 0.4, "boss row attack chance is at least 40%")
+end
+
 M["arena has no energy cells"] = function(t)
 	local pr, br = arena.generate_rows(rng.new(5), arena.player_row_chances(0.6))
 	for x = 0, COLUMNS - 1 do

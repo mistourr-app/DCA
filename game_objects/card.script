@@ -14,7 +14,7 @@ local anim = require("scripts.view.anim")
 
 go.property("lift_scale", 1.15)
 go.property("lunge_ms", 100)
-go.property("fall_ms", 400)
+go.property("fall_ms", 600)
 go.property("flash_ms", 100)
 go.property("flash_color", vmath.vector4(1, 1, 1, 1))
 

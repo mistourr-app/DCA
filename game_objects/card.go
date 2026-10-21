@@ -6,12 +6,20 @@ components {
   id: "label"
   component: "/game_objects/cell_label.label"
   position {
-    x: 0.0
-    y: 0.0
     z: 0.2
   }
 }
 components {
   id: "card"
   component: "/game_objects/card.script"
+  properties {
+    id: "lift_scale"
+    value: "1.25"
+    type: PROPERTY_TYPE_NUMBER
+  }
+  properties {
+    id: "lunge_ms"
+    value: "150.0"
+    type: PROPERTY_TYPE_NUMBER
+  }
 }
