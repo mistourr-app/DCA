@@ -38,7 +38,7 @@ jobs:
       - name: Resolve, build and bundle HTML5
         run: |
           set -euo pipefail
-          java -jar bob.jar --platform js-web \
+          java -jar bob.jar --platform wasm-web \
             --bundle-output build/bundle \
             resolve distclean build bundle --archive
 
