@@ -1,0 +1,65 @@
+name: Build HTML5 and deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25 (required by bob)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Download bob.jar (Defold stable channel)
+        run: |
+          set -euo pipefail
+          SHA=$(curl -s https://d.defold.com/stable/info.json | jq -r .sha1)
+          echo "Defold stable SHA1: $SHA"
+          curl -sL -o bob.jar "https://d.defold.com/archive/stable/${SHA}/bob/bob.jar"
+          java -jar bob.jar --version
+
+      - name: Resolve, build and bundle HTML5
+        run: |
+          set -euo pipefail
+          java -jar bob.jar --platform js-web \
+            --bundle-output build/bundle \
+            resolve distclean build bundle --archive
+
+      - name: List bundle contents
+        run: find build/bundle -maxdepth 2 -type f | head -50
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/bundle
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
