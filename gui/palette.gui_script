@@ -1,0 +1,20 @@
+-- Палитра игры (GDD §16): цвета живут в узлах gui/palette.gui и правятся цветовым пикером
+-- GUI-редактора (RGBA + alpha + hex). У script properties пикера нет — docs/ENGINE_DEFOLD.md §3b.
+-- Узлы выключены (enabled: false): не рисуются, но их color читается через gui.get_color.
+-- При старте цвета уходят в collections/world.script сообщением "palette"; тот хранит их
+-- в self.pal. Имена узлов = ключи scripts/view/palette.lua.
+
+local palette = require("scripts.view.palette")
+
+function init(self)
+	local colors = {}
+	for _, key in ipairs(palette.KEYS) do
+		local node = gui.get_node(key)
+		if node == nil then
+			error("palette.gui: нет узла '" .. key .. "' (список — scripts/view/palette.lua)")
+		end
+		colors[key] = gui.get_color(node)
+	end
+	-- "#world" — компонент collections/world.script на том же game object world.
+	msg.post("#world", "palette", { colors = colors })
+end

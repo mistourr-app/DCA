@@ -1,6 +1,7 @@
 -- Всплывающая цифра (урон/лечение/золото). Сообщение "show":
 --   text — строка, kind — "damage" | "heal" | "gold" (цвет берётся из свойства скрипта).
 -- Всплывает на float_rise пикселей, гаснет за float_ms и удаляет себя сама.
+-- Цвета — vector4: x = red, y = green, z = blue, w = alpha (поля X/Y/Z/W в инспекторе).
 -- go.animate: (url, property, playback, to, easing, duration, delay, complete_function).
 
 go.property("float_ms", 600)

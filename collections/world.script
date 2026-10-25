@@ -27,22 +27,22 @@ local timeline = require("scripts.view.timeline")
 local board = require("scripts.view.board")
 local hud = require("scripts.view.hud")
 local style = require("scripts.view.style")
+local layers = require("scripts.view.layers")
+local palette = require("scripts.view.palette")
 
 local MODES = world.MODES
 local BUTTON_HEIGHT = layout.MARGIN_BOTTOM
 
--- Слои отрисовки (position.z). Default-камера Defold рендерит только z в [-1..1], вне диапазона
--- объект молча не рисуется; больше z = ближе к камере; равный z = порядок не определён.
--- label в card.go поднят на +0.2 внутри GO: «содержимое» клетки остаётся поверх слоя угроз.
--- Клетки < слой угроз < подписи клеток < обводки < персонажи < красный «вас видят» < пунктир < цифры.
--- Слои обводок/пунктира/цифр — в scripts/view/fx.lua; слои карт (0, 0.3) — в scripts/view/board.lua.
-local Z_THREAT = 0.1
-local Z_SPOTTED = 0.4
+-- Слои отрисовки (position.z) — единый источник scripts/view/layers.lua, порядок проверяет
+-- tests/view/layers_test.lua. Снизу вверх: клетки < подсветки клеток < карты актёров < пунктир <
+-- цифры. Подписи карт подняты на +0.2 компонентом в card.go (layers.LABEL_OFFSET).
+local Z_THREAT = layers.THREAT
+local Z_SPOTTED = layers.SPOTTED
 
--- Слой z — константы кода (порядок отрисовки, не настраиваемые данные).
 -- Презентационные числа вынесены в config-скрипты на том же world.go
--- (docs/DEFOLD_INTEGRATION.md §5.2): geom_cfg, anim_cfg, flash_cfg, palette_cfg.
+-- (docs/DEFOLD_INTEGRATION.md §5.2): geom_cfg, anim_cfg, flash_cfg.
 -- Значения читаются один раз в init (go.get) и живут в self.
+-- Палитра — отдельно: gui/palette.gui с цветовым пикером, приходит сообщением "palette".
 
 -- debug_seed ≠ 0 фиксирует seed мира для тюнинга (в репозитории всегда 0).
 -- Это параметр мира, а не презентация: единственное go.property на world.script.
@@ -51,16 +51,6 @@ go.property("debug_seed", 0)
 local GEOM_CFG = "#geom_cfg"
 local ANIM_CFG = "#anim_cfg"
 local FLASH_CFG = "#flash_cfg"
-local PALETTE_CFG = "#palette_cfg"
-
--- Роли палитры в palette_cfg (docs/DEFOLD_INTEGRATION.md §5.2, §5.4).
-local PALETTE_KEYS = {
-	"fill_neutral", "fill_wall", "fill_good", "fill_gold",
-	"fill_danger", "fill_attack", "fill_camp", "fill_player",
-	"ink_dark", "ink_light",
-	"outline_step", "outline_jump", "outline_attack",
-	"dot", "vision", "spotted",
-}
 
 -- Вид хода -> роль палитры для обводки.
 local OUTLINE_KEY = {
@@ -81,10 +71,8 @@ local function read_config(self)
 	self.color_flash = go.get(FLASH_CFG, "color_flash")
 	self.flash_alpha = go.get(FLASH_CFG, "flash_alpha")
 	self.flash_ms = go.get(FLASH_CFG, "flash_ms")
-	self.pal = {}
-	for _, key in ipairs(PALETTE_KEYS) do
-		self.pal[key] = go.get(PALETTE_CFG, key)
-	end
+	-- Палитра здесь не читается: цвета живут в gui/palette.gui и приходят сообщением "palette"
+	-- от palette.gui_script. До этого сообщения self.pal = nil, а refresh ничего не рисует.
 end
 
 -- Проверка связей style -> palette при старте (§5.6): неизвестная роль дала бы
@@ -92,8 +80,11 @@ end
 local function check_palette(self)
 	local function need(desc, key)
 		if self.pal[key] == nil then
-			error("palette_cfg: нет свойства " .. key .. " для " .. desc)
+			error("палитра: нет цвета '" .. key .. "' (нужен для " .. desc .. ")")
 		end
+	end
+	for _, key in ipairs(palette.KEYS) do
+		need("полного набора scripts/view/palette.lua", key)
 	end
 	for type_, view in pairs(style) do
 		need("fill " .. type_, view.fill)
@@ -153,6 +144,9 @@ end
 
 -- Перерисовка: доска (контейнер, карты, акторы, очистка fx), затем подсветки поверх.
 local function refresh(self)
+	if self.pal == nil then
+		return -- палитра ещё не пришла от gui/palette.gui (первый кадр)
+	end
 	ensure_arena_preview(self)
 	local pr = self.world.pos.y
 	board.refresh(self)
@@ -165,7 +159,7 @@ local function refresh(self)
 			local alpha = highlight.vision_alpha(vision_row[x])
 			if alpha ~= nil then
 				if y == pr and x == self.world.pos.x and self.world.mode == MODES.WORLD then
-					-- Игрок в поле зрения: его клетка красная, поверх спрайта персонажа, под надписью.
+					-- Игрок в поле зрения: его клетка красная, над заливкой клетки и под картой персонажа.
 					fx.threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED)
 				else
 					fx.threat(self, layout.cell_x(x), cy, h, self.pal.vision, alpha, Z_THREAT)
@@ -204,7 +198,14 @@ end
 -- ================= Анимации =================
 
 -- Раннер таймлайна и ожидание "anim_done" — в scripts/view/timeline.lua.
+-- on_palette объявлен ниже: finish_view определён после on_message.
+local on_palette
+
 function on_message(self, message_id, message, sender)
+	if message_id == hash("palette") then
+		on_palette(self, message)
+		return
+	end
 	timeline.on_message(self, message_id, message, sender)
 end
 
@@ -507,6 +508,15 @@ local function finish_view(self)
 	refresh(self)
 end
 
+-- "palette" от gui/palette.gui: цвета правятся пикером в GUI-редакторе. До сообщения
+-- refresh не рисует поле; после — первая отрисовка (см. init: finish_view вызывается сразу,
+-- но refresh ждёт палитру).
+on_palette = function(self, message)
+	self.pal = message.colors
+	check_palette(self)
+	finish_view(self)
+end
+
 -- Клетки ряда точки возврата сохраняются целиком: этот ряд не пересоздаётся между сессиями.
 local function return_point_for_save(self)
 	local rp = self.world.return_point
@@ -790,7 +800,7 @@ end
 
 function init(self)
 	read_config(self)
-	check_palette(self)
+	-- check_palette — не здесь: палитра приходит сообщением "palette" (on_palette).
 	msg.post(".", "acquire_input_focus")
 	self.rows_id = go.get_id("rows")
 	local data, found = saves.load()
@@ -807,6 +817,7 @@ function init(self)
 	self.rows = {}
 	self.cards = {}
 	self.fx = {}
+	self.pal = nil -- придёт сообщением "palette" от gui/palette.gui
 	self.input_locked = false
 	self.anim_waiters = {}
 	self.anim_token = 0

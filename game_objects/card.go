@@ -22,4 +22,19 @@ components {
     value: "150.0"
     type: PROPERTY_TYPE_NUMBER
   }
+  properties {
+    id: "fall_ms"
+    value: "600.0"
+    type: PROPERTY_TYPE_NUMBER
+  }
+  properties {
+    id: "flash_ms"
+    value: "100.0"
+    type: PROPERTY_TYPE_NUMBER
+  }
+  properties {
+    id: "flash_color"
+    value: "1.0, 1.0, 1.0, 1.0"
+    type: PROPERTY_TYPE_VECTOR4
+  }
 }

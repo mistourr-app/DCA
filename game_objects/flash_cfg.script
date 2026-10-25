@@ -1,6 +1,7 @@
 -- Вспышка экрана при уроне по игроку (GDD §16).
 -- gui-скрипты не поддерживают go.property, поэтому параметры живут здесь
 -- и уходят в HUD сообщением "flash". Правятся в инспекторе инстанса world.
+-- Цвет — vector4: x = red, y = green, z = blue, w = alpha (поля X/Y/Z/W в инспекторе).
 
 go.property("color_flash", vmath.vector4(1, 0.05, 0.05, 1))
 go.property("flash_alpha", 0.45)

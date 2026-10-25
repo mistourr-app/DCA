@@ -7,13 +7,14 @@ local world = require("core.world")
 local registry = require("core.registry.init")
 local style = require("scripts.view.style")
 local fx = require("scripts.view.fx")
+local layers = require("scripts.view.layers")
 
 local MODES = world.MODES
 
--- Слои карт (position.z): поле (0) и акторы (0.3); подсветки выше — см. fx.lua.
+-- Слои карт (position.z): поле и акторы; полная карта слоёв — scripts/view/layers.lua.
 -- Экспортируются для координатора (анимация хода карты игрока).
-local Z_CELL = 0
-local Z_ACTOR = 0.3
+local Z_CELL = layers.CELL_FILL
+local Z_ACTOR = layers.ACTOR
 
 local M = {}
 M.Z_CELL = Z_CELL

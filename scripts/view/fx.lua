@@ -3,15 +3,16 @@
 -- Функции принимают контекст-скрипт self (паттерн из §5.7), состояния не хранят.
 local layout = require("core.layout")
 local highlight = require("core.highlight")
+local layers = require("scripts.view.layers")
 
 local BAR_URL = "#bar_factory"
 local POPUP_URL = "#popup_factory"
 
--- Слои (position.z): обводки под картами-акторами (0.3) и поверх подписей клеток (0.2).
--- Карта слоёв — в world.script.
-local Z_OUTLINE = 0.25
-local Z_DASH = 0.7
-local Z_POPUP = 0.8
+-- Слои z (position.z) — единый источник: scripts/view/layers.lua; порядок проверяет тест.
+-- Обводки под картами-акторами и поверх подписей клеток.
+local Z_OUTLINE = layers.OUTLINE
+local Z_DASH = layers.DASH
+local Z_POPUP = layers.POPUP
 
 local M = {}
 

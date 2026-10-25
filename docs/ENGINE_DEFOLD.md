@@ -58,13 +58,14 @@
 - Графика прототипа: клетки — белый квадрат assets/cell.png (32×32) с nearest-фильтром ([graphics] default_texture_*_filter = nearest), окрашивается через tint. Встроенный particle_blob не использовать для клеток: он размытый.
 - Шрифт прототипа: assets/label.font (встроенный vera_mo_bd.ttf, size 30). /builtins/fonts/default.font маленький: надписи в клетках становятся нечитаемыми. Масштабировать объект с label нельзя: растянется текст. Размер текста задаётся только в .font.
 - Устаревшее: label.set_text (предупреждение GAMESYS). Использовать go.set("#label", "text", value).
-- Z-слои 2D: орфографическая content-проекция рендерит только z в диапазоне [-1..1]. Объект с z вне диапазона НЕ рисуется молча, без ошибок в логе (проверено: z=10..30 — объекты исчезли). Больше z = ближе к камере (рисуется позже); равный z = порядок не определён, возможны мигания. Итоговый z = z game object + z компонента + z родительских GO. Z-константы — в `collections/world.script` и `scripts/view/fx.lua`, держим в (0..1); надписи карт подняты на +0.2 компонентом в `card.go`, чтобы слой угроз (0.1) не перекрывал текст.
+- Z-слои 2D: орфографическая content-проекция рендерит только z в диапазоне [-1..1]. Объект с z вне диапазона НЕ рисуется молча, без ошибок в логе (проверено: z=10..30 — объекты исчезли). Больше z = ближе к камере (рисуется позже); равный z = порядок не определён, возможны мигания. Итоговый z = z game object + z компонента + z родительских GO. Все z-константы — в `scripts/view/layers.lua` (единый источник), держим в (0..1); порядок снизу вверх: клетки < оверлей угрозы < «вас видят» < подписи клеток < обводки < карты акторов < пунктир < цифры. Порядок фиксирует `tests/view/layers_test.lua`. Надписи карт подняты на +0.2 компонентом в `card.go` (`layers.LABEL_OFFSET`), чтобы подсветки не перекрывали текст.
 - Уже проверено в 1.14.0: у label нет полей text_leading, text_tracking, align, blend_mode; у gui нет значений ADJUST_FIT, ADJUST_STRETCH.
 - Easing для go.animate: константы в пространстве go.EASING_* (go.EASING_INOUTQUAD, go.EASING_OUTBACK и т.п.). Имени vmath.EASE_* не существует; nil в аргументе easing даёт runtime error "easing must be either a easing constant or a vmath.vector" в момент вызова animate.
 - Сигнатура go.animate: (url, property, playback, to, easing, duration, delay, complete_function) — complete_function передаётся только 8-м аргументом, 7-й это delay; вызов с колбэком на месте delay = "bad argument #7 (number expected, got function)".
 - Сигнатура gui.animate ДРУГАЯ: (node, property, to, easing, duration, delay, complete_function, playback) — playback не на 3-м месте, отмена gui.cancel_animations(node, "color"), easing gui.EASING_*. Не путать с go.animate.
 - Масштаб «подъёма» карты: анимировать надо scale компонента "#sprite", а не GO целиком — scale game object с label растягивает текст (см. выше).
 - go.property: дефолт — только литерал (число, строка, hash, vmath-конструктор с литералами); арифметика вида `26/255` не проходит линтером редактора ("invalid numeric argument"), значения пересчитывать заранее. В gui_script go.property запрещён в принципе ("cannot be used in this file type") — параметры передавать сообщением из .script.
+- Цвет как script property — только `vmath.vector4`: x = red, y = green, z = blue, w = alpha. Отдельного типа «color» нет, в инспекторе поля подписаны X/Y/Z/W, цветового пикера нет (в manual: «all color values are encoded in a vector4»). В `.go`/`.collection`: `value: "1.0, 0.122, 0.122, 1.0"`, `type: PROPERTY_TYPE_VECTOR4` (через запятую с пробелом). Пикер цвета есть только у GUI-нод (`gui/palette.gui`) — общая палитра игры живёт там.
 
 ## 4. Mobile-специфика
 
@@ -83,6 +84,7 @@
 - Вторичный: HTML5 для быстрой проверки в браузере (необязательно для прототипа).
 - Desktop (`Windows`, `macOS`, `Linux`) — для разработки и отладки в редакторе.
 - Для Android: минимальный SDK и таргет — значения из актуальной документации Defold 1.14.0 (раздел «Android» manual). Не выдумывать версии, сверять с manual на момент сборки.
+- Собранный проект можно запускать без редактора (`bob` + `dmengine`, порядок команд — `docs/TESTING.md` §8). Факт движка 1.14.0: `dmengine.exe --config=<путь>` не поддерживается (пишет `WARNING:DLIB: Invalid config option`), движок грузит данные из `build/default` относительно текущей рабочей папки.
 
 ## 6. Что не используем
 

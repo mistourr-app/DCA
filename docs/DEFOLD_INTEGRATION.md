@@ -45,7 +45,7 @@ collections/world.collection
 │     ├── geom_cfg        → game_objects/geom_cfg.script
 │     ├── anim_cfg        → game_objects/anim_cfg.script
 │     ├── flash_cfg       → game_objects/flash_cfg.script
-│     ├── palette_cfg     → game_objects/palette_cfg.script  (16 ролевых цветов)
+│     ├── palette        → gui/palette.gui                (16 цветов, пикер GUI)
 │     ├── card_factory    → game_objects/card.go        (5 go.property в card.script)
 │     ├── bar_factory     → game_objects/bar.go
 │     ├── popup_factory   → game_objects/popup.go        (5 go.property в popup.script)
@@ -66,18 +66,20 @@ collections/world.collection
 | `game_objects/geom_cfg.script` | 4 | `cell_gap`, `border_width`, `dash_step`, `dash_size` |
 | `game_objects/anim_cfg.script` | 4 | `move_ms`, `fall_drop`, `popup_spread`, `popup_y_factor` |
 | `game_objects/flash_cfg.script` | 3 | `color_flash`, `flash_alpha`, `flash_ms` |
-| `game_objects/palette_cfg.script` | 16 | роль-палитра: `fill_neutral`/`fill_wall`/`fill_good`/`fill_gold`/`fill_danger`/`fill_attack`/`fill_camp`/`fill_player`, `ink_dark`/`ink_light`, `outline_step`/`outline_jump`/`outline_attack`, `dot`/`vision`/`spotted` |
 | `game_objects/card.script` | 5 | `lift_scale`, `lunge_ms`, `fall_ms`, `flash_ms`, `flash_color` |
 | `game_objects/popup.script` | 5 | `float_ms`, `float_rise`, `color_damage`, `color_heal`, `color_gold` |
 | `gui/hud.gui_script` | 0 | невозможно; параметры вспышки приходят сообщением `flash`; динамические текстуры фейдов создаются в `init` |
+| `gui/palette.gui` | — | не `go.property`: 16 выключенных box-узлов с цветом; правятся пикером GUI-редактора, `palette.gui_script` читает их и шлёт `palette` |
 
-`world.script` читает конфиги через `go.get("#geom_cfg", ...)` и держит значения в `self` (`read_config`), проверяя при старте полноту палитры (`check_palette`).
+`world.script` читает конфиги через `go.get("#geom_cfg", ...)` и держит значения в `self` (`read_config`). Палитра приходит отдельно — сообщением `palette` от `palette.gui_script` (цвета задаются пикером в GUI-редакторе: у script properties пикера нет, `docs/ENGINE_DEFOLD.md` §3b); при старте `check_palette` проверяет полноту ролей.
+
+У каждого прототипа все свойства компонента-скрипта продублированы явными `properties` в `.go`: открыл `card.go`/`popup.go` — увидел фактические значения и правишь их, не заглядывая в `.script`. Конфиги на `world.go` наоборот держат значения в дефолтах `go.property`; `world.collection` переопределяет только то, что у инстанса отличается (`move_ms = 400`). Оба варианта видны и правятся в инспекторе (`docs/AI_CODING_RULES.md` §0).
 
 ### 3.3 Метрики
 
 - `collections/world.script` — 813 строк: ввод, маршрутизация режимов, вызовы `core/`, делегирование view-модулям, лагерь, смерть, сохранения.
-- Презентация вынесена в `scripts/view/`: `style.lua` (тип → символ + роли палитры), `fx.lua` (обводки, пунктир, угрозы, цифры), `timeline.lua` (раннер анимаций и `anim_done`), `anim.lua` (примитивы lift/lunge/fall/flash), `board.lua` (ряды, diff-синхронизация карт, карты акторов), `hud.lua` (строки HUD). `world.script` — тонкий координатор.
-- Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском.
+- Презентация вынесена в `scripts/view/`: `style.lua` (тип → символ + роли палитры), `layers.lua` (z-слои отрисовки поля), `palette.lua` (роли палитры = имена узлов `gui/palette.gui`), `fx.lua` (обводки, пунктир, угрозы, цифры), `timeline.lua` (раннер анимаций и `anim_done`), `anim.lua` (примитивы lift/lunge/fall/flash), `board.lua` (ряды, diff-синхронизация карт, карты акторов), `hud.lua` (строки HUD). `world.script` — тонкий координатор.
+- Движковые проверки автотестами не покрыты (`docs/TESTING.md` §1): изменения скриптов проверяются сборкой и ручным запуском. Ошибки Lua при старте ловятся запуском собранного проекта без редактора (`docs/TESTING.md` §8).
 
 ---
 
@@ -124,6 +126,8 @@ scripts/view/              общие модули отрисовки (Defold-fa
    ├── fx.lua              bars: обводки, пунктир, слой угроз, всплывающие цифры
    ├── anim.lua            примитивы анимации ГО (lift/lunge/fall/flash) — «анимация один раз»
    ├── style.lua           view-registry: ключ типа → { symbol, fill_role, ink_role }
+   ├── palette.lua         роли палитры = имена узлов gui/palette.gui (пикер GUI)
+   ├── layers.lua          z-слои отрисовки поля: единый источник порядка (тест в tests/view)
    └── hud.lua             сборка строк HUD и сообщений в hud.gui
    ▲
 collections/world.script   тонкий координатор: ввод, режимы, вызовы core, таймлайн, делегирование
@@ -143,9 +147,10 @@ game_objects/              прототипы и скрипты
 | `geom_cfg` | `cell_gap`, `border_width`, `dash_step`, `dash_size` |
 | `anim_cfg` | `move_ms`, `fall_drop`, `popup_spread`, `popup_y_factor` |
 | `flash_cfg` | `color_flash`, `flash_alpha`, `flash_ms` |
-| `palette_cfg` | роль-палитра: `fill_neutral`, `fill_wall`, `fill_good`, `fill_gold`, `fill_danger`, `fill_attack`, `fill_camp`, `fill_player`, `ink_dark`, `ink_light`, цвета обводок/пунктира/угроз |
 
-Имена в `palette_cfg` — роли (§5.4): на этапе 1 свойства переносились под временными именами `color_*`, на этапе 2 заменены ролями, а связь «тип → роли» вынесена в `scripts/view/style.lua`. `debug_seed` остаётся единственным `go.property` на самом `world.script` — это параметр мира, а не конфиг анимации или отрисовки.
+Палитра — не config-скрипт: цвета в `go.property` редактируются четырьмя числами X/Y/Z/W без цветового пикера (`docs/ENGINE_DEFOLD.md` §3b). Поэтому 16 ролей живут в `gui/palette.gui` — выключенных box-узлах, у которых в GUI-редакторе есть настоящий пикер (RGBA, alpha, hex). `palette.gui_script` читает их в `init` и шлёт `world.script` сообщение `palette`; список ролей — `scripts/view/palette.lua` (общий для скрипта и теста).
+
+Имена ролей (§5.4): на этапе 1 свойства переносились под временными именами `color_*`, на этапе 2 заменены ролями, а связь «тип → роли» вынесена в `scripts/view/style.lua`. `debug_seed` остаётся единственным `go.property` на самом `world.script` — это параметр мира, а не конфиг анимации или отрисовки.
 
 `world.script` читает конфиги обычным `go.get("#geom_cfg", "cell_gap")`: значения `go.property` — константы сборки и от `init` владельца не зависят (§4.2), поэтому ленивое чтение не требуется. Схема с sibling-компонентами выбрана по локальности и числу сущностей; отдельный объект `config` в коллекции отклонён — меньше локальности.
 
@@ -180,12 +185,10 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 
 ### 5.6 Проверка связей style → palette
 
-Роль в `style.lua`, которой нет в `palette_cfg`, даёт молчаливый `nil` и падение в бою. Защита — две независимые проверки, закрывающие разные ошибки:
+Роль в `style.lua`, которой нет в палитре, даёт молчаливый `nil` и падение в бою. Защита — две независимые проверки, закрывающие разные ошибки:
 
-- **Обязательно — проверка при старте.** Игра проходит по всем записям `style.lua` и убеждается, что каждая роль есть в `palette_cfg`. Ненайденная роль — остановка с понятным сообщением разработчика. Ловит «роль есть в таблице, но забыта в редакторе»; работает только при запуске игры.
-- **По желанию — быстрый тест без движка.** Отдельный тест (`luajit tests/run.lua`) сверяет, что таблица типов ссылается только на допустимые имена ролей. Ловит опечатку в имени роли и работает до запуска игры, но требует держать список допустимых имён отдельным чистым модулем и поддерживать его в согласии с `palette_cfg`.
-
-Первая проверка обязательна, вторая — опциональна.
+- **Обязательно — проверка при старте.** Получив сообщение `palette`, игра проходит по всем записям `style.lua` и `scripts/view/palette.lua` и убеждается, что каждая роль есть в `self.pal`. Ненайденная роль — остановка с понятным сообщением разработчика. Ловит «роль есть в таблице, но забыта в `palette.gui`»; работает только при запуске игры.
+- **Тест без движка.** `tests/view/palette_test.lua` сверяет, что `palette.KEYS` покрывает все роли `style.lua` и подсветки, а ключи уникальны. Ловит опечатку и забытую роль до запуска игры.
 
 ### 5.7 Интерфейсы модулей (этап 3.0)
 
@@ -218,7 +221,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 - `board.lunge_offset(x0, y0, x1, y1, fraction) -> vector3` (чистая)
 - `board.refresh(self)` (позиция контейнера, diff клеток, карты акторов, `fx.clear`)
 
-Слои карт `board.Z_CELL` (0) и `board.Z_ACTOR` (0.3) экспортируются: их использует координатор при анимации хода игрока.
+Слои карт `board.Z_CELL` (0) и `board.Z_ACTOR` (0.3) экспортируются: их использует координатор при анимации хода игрока. Сами значения берутся из `scripts/view/layers.lua` — там же оверлеи, обводки, пунктир и цифры. Порядок снизу вверх: клетки < оверлей угрозы < «вас видят» < подписи клеток < обводки < карты акторов < пунктир < цифры; его фиксирует `tests/view/layers_test.lua`, чтобы слой снова не уехал над картами.
 
 **`scripts/view/fx.lua`** — одноразовые ГО (обводки, пунктир, угрозы, цифры):
 
@@ -259,7 +262,7 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 2. **Баланс.** Строки в `balance/balance.csv` → `python tools/build_balance.py`.
 3. **Реестр ядра.** Запись в `core/registry/*` (данные + обработчики). Ядро не меняется.
 4. **Вид.** Строка в `scripts/view/style.lua`: `{ symbol, fill_role, ink_role }`.
-5. **Проверка вида.** Убедиться, что роли из новой записи существуют в `palette_cfg` (проверка при старте, §5.6); при необходимости добавить роль в `palette_cfg`.
+5. **Проверка вида.** Убедиться, что роли из новой записи есть в `scripts/view/palette.lua` и в `gui/palette.gui` (проверка при старте, §5.6); при необходимости добавить узел и цвет пикером.
 6. **Тесты.** `tests/core/<name>_test.lua`; тест реестра (`tests/registry_test.lua`).
 7. **Проверка.** `python tools/build_balance.py --check`, `luajit tests/run.lua`, сборка и запуск в редакторе.
 
@@ -269,21 +272,21 @@ M.BOSS        = { symbol = "B", fill = "fill_danger",  ink = "ink_light" }
 
 ## 7. План реализации
 
-Каждый этап — отдельный коммит с проверкой. Порядок: сначала дешёвые и снижающие риск шаги (доки), затем группировка свойств, затем дробный вынос модулей. `core/` не меняется, поэтому `luajit tests/run.lua` (228 тестов) и `build_balance.py --check` остаются зелёными; движковая часть проверяется сборкой и ручным запуском (`docs/TESTING.md` §1, §6).
+Каждый этап — отдельный коммит с проверкой. Порядок: сначала дешёвые и снижающие риск шаги (доки), затем группировка свойств, затем дробный вынос модулей. `core/` не меняется, поэтому `luajit tests/run.lua` (все тесты `tests/`) и `build_balance.py --check` остаются зелёными; движковая часть проверяется сборкой и ручным запуском (`docs/TESTING.md` §1, §6).
 
 **Синхронизация документации — часть каждого этапа** (Definition of Done): после шага документы описывают то, что реально в коде. Отдельного финального «этапа только для доков» нет.
 
 | Этап | Содержание | Проверка |
 |---|---|---|
 | 0 | Синхронизация документации под текущий факт | **Выполнено** (фаза 1: `ARCHITECTURE`, `AI_CODING_RULES`, `BALANCE`, `TESTING`, `ENGINE_DEFOLD`, `CONVENTIONS`, `PLAN`; `PLAN_14` удалён) |
-| 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка полноты палитры при старте | **Выполнено**; сборка 1.14.0, лог без ERROR, ручная игра |
+| 1 | Config-компоненты на `world.go` (`geom_cfg`/`anim_cfg`/`flash_cfg`/`palette_cfg`); перенос свойств; чтение через `go.get`; проверка полноты палитры при старте | **Выполнено**; сборка 1.14.0, лог без ERROR, ручная игра. Палитра позже переехала в `gui/palette.gui` (пикер, §5.2) |
 | 2 | Роль-палитра + `scripts/view/style.lua`; снятие `SYMBOL`/`FILL_KEY`/`INK_KEY` из `world.script`; проверка style → palette (§5.6) | **Выполнено**; сборка, ручная сверка вида клеток/врагов/игрока |
 | 3.0 | Фиксация интерфейсов модулей (кто владеет `self.cards`, `self.anim_waiters`, `self.fx`, `self.anim_token`; сигнатуры) | **Выполнено** (§5.7); ревью, поведение не меняется |
 | 3a | Переименование `cell.go`/`cell.script`/`cell_factory` → `card.go`/`card.script`/`card_factory` (правки в `world.go`, `world.script`, прототипе); вынос `scripts/view/fx.lua` | **Выполнено**; сборка, ручная игра |
 | 3b | Вынос `scripts/view/timeline.lua` (+ `card_anim`) | **Выполнено**; сборка, прогон боя, атак «в спину», арены |
 | 3c | Вынос `scripts/view/board.lua` (diff-синхронизация, идентичность карт, `content_row` арены) и `scripts/view/hud.lua`; `world.script` — тонкий координатор | **Выполнено**; сборка, ручная игра всех режимов |
 
-Порядок внутри 3 задан от менее связанного к более связанному (`fx` → `timeline` → `board`), чтобы не переписывать весь отлаженный таймлайн одним коммитом. `anim.lua` вынесен отдельным коммитом после 3a (примитивы анимации — общий код для будущих прототипов; `card.script` собирает абсолютные url компонентов в `init`). `cell` → `card` сделано в 3a: имя уже врёт (прототип универсальный), а ссылок мало. Палитра переходит между этапами 1 и 2: на этапе 1 `palette_cfg` переносит свойства под текущими именами (`color_*`), на этапе 2 они переименовываются в роли и подключается `style.lua` — так этап 1 не меняет картинку.
+Порядок внутри 3 задан от менее связанного к более связанному (`fx` → `timeline` → `board`), чтобы не переписывать весь отлаженный таймлайн одним коммитом. `anim.lua` вынесен отдельным коммитом после 3a (примитивы анимации — общий код для будущих прототипов; `card.script` собирает абсолютные url компонентов в `init`). `cell` → `card` сделано в 3a: имя уже врёт (прототип универсальный), а ссылок мало. Палитра переходит между этапами 1 и 2: на этапе 1 `palette_cfg` переносит свойства под текущими именами (`color_*`), на этапе 2 они переименовываются в роли и подключается `style.lua` — так этап 1 не меняет картинку. Текущее место цветов — `gui/palette.gui` с пикером GUI (§5.2).
 
 ---
 

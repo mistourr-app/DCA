@@ -1,7 +1,7 @@
 -- Клетка-карта: прямоугольник-подложка (sprite) и надпись (label). Сообщение "set":
 --   width, height (в логических px), color (фон), text, text_color.
 -- Масштаб применяется только спрайту: label масштабить нельзя — растянется текст.
--- Параметры анимаций — свойства скрипта (правятся в инспекторе card.go), длительности в мс.
+-- Параметры анимаций заданы явно в card.go; здесь — те же значения как база для новых прототипов.
 -- Примитивы lift/lunge/fall/flash — в scripts/view/anim.lua; здесь остаётся протокол сообщений.
 -- Сообщения (по завершении шлют отправителю "anim_done" {token}):
 --   "lift"  {duration} — подложка приподнимается до lift_scale и возвращается (секунды;
@@ -10,10 +10,12 @@
 --   "fall"  {offset}   — падение поверженной карты с уходом в прозрачность (fall_ms);
 --   "flash" {}         — вспышка подложки flash_color (flash_ms, попадание арбалета).
 
+-- Параметры анимаций: те же значения, что в card.go (правятся в инспекторе прототипа).
+-- flash_color — vector4: x = red, y = green, z = blue, w = alpha (поля X/Y/Z/W в инспекторе).
 local anim = require("scripts.view.anim")
 
-go.property("lift_scale", 1.15)
-go.property("lunge_ms", 100)
+go.property("lift_scale", 1.25)
+go.property("lunge_ms", 150)
 go.property("fall_ms", 600)
 go.property("flash_ms", 100)
 go.property("flash_color", vmath.vector4(1, 1, 1, 1))

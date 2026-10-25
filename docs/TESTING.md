@@ -6,12 +6,15 @@
 |---|---|---|---|
 | Ядро (`core/`) | правила, генерация рядов, бой, лагерь, смерть, сохранения | `luajit tests/run.lua` (вне движка) | перед каждым коммитом |
 | Реестры | уникальность ключей, обязательные поля, ссылки на CSV | `tests/registry_test.lua` | перед каждым коммитом сущностей |
+| Слои отрисовки | порядок z: клетки < подсветки < карты < пунктир < цифры | `tests/view/layers_test.lua` | при правке `layers.lua` и эффектов |
+| Палитра | роли `style.lua` покрыты `palette.KEYS`, ключи уникальны | `tests/view/palette_test.lua` | при правке `style.lua`/`palette.lua` |
 | Баланс | CSV ↔ `core/data/*.lua` | `python tools/build_balance.py --check` | перед каждым коммитом баланса |
 | Сборка | проект компилируется, ссылки на ресурсы целы | Build в редакторе 1.14.0 | перед коммитом изменений `.collection`, `.go`, `.gui` |
 | Загрузка | коллекции и GUI загружаются без ошибок | запуск в редакторе, лог без `ERROR` | перед коммитом изменений коллекций |
+| Скрипты при старте | `ERROR:SCRIPT` нет: все `init`/`on_message` отработали, палитра дошла | сборка `bob` + запуск `dmengine` без редактора (§8) | перед коммитом изменений `.script`/`.gui_script` |
 | Ручная игра | ввод, вёрстка, лагерь, смерть, арена | десктоп и Android-устройство | перед каждым тестовым билдом |
 
-Автоматические тесты в движке на этапе прототипа не вводятся. Основная логика проверяется вне движка.
+Автоматические тесты в движке на этапе прототипа не вводятся. Основная логика проверяется вне движка. Ошибки Lua при старте ловятся запуском собранного проекта без редактора (§8) — это быстрее, чем ручной F5, и даёт тот же текст `ERROR:SCRIPT`.
 
 ---
 
@@ -101,7 +104,7 @@ return M
 1. `python tools/build_balance.py --check` — без ошибок.
 2. `luajit tests/run.lua` — все тесты зелёные.
 3. Build в редакторе 1.14.0 — без ошибок и предупреждений о недостающих ресурсах.
-4. Лог запуска без `ERROR`.
+4. Лог запуска без `ERROR`. Без редактора: сборка `bob` + `dmengine` (§8), `run.err` пуст.
 5. Если менялась вёрстка или ввод — проверка на десктопе в портретном окне 720×1560 и на Android-устройстве.
 
 ---
@@ -120,7 +123,54 @@ return M
 
 ---
 
-## 8. Что не тестируем на этапе прототипа
+## 8. Запуск без редактора (bob + dmengine)
+
+Нужен, чтобы увидеть `ERROR:SCRIPT` и отладочные `print` без ручного F5: редактор держит проект, а `bob` из его же пакетов собирает то же самое в отдельную папку. Проверено на 1.14.0 (Windows, PowerShell).
+
+**Где взять инструменты.** Рядом с `Defold.exe` лежит `packages/`: там `defold-<sha1>.jar` (он же `bob`), `jdk-*/bin/java.exe` и распакованный движок `%LOCALAPPDATA%\Defold\unpack\<sha1>-x86_64\x86_64-win32\bin\dmengine.exe`. Версия `bob` и движка должна совпадать с редактором (`bob --version` печатает `bob.jar version: 1.14.0`).
+
+**Сборка в отдельную папку.** `-o build\verify`, а не `build\default`: последний принадлежит редактору, и перезапись ломает его инкрементальную сборку.
+
+```powershell
+$defold = 'C:\Users\<user>\Downloads\Defold-x86_64-win32\Defold'
+$java = "$defold\packages\jdk-25.0.4.1+1\bin\java.exe"
+$jar  = (Get-ChildItem "$defold\packages" -Filter 'defold-*.jar').FullName
+& $java -cp $jar com.dynamo.bob.Bob --root . -o build\verify -p x86_64-win32 --variant debug build
+```
+
+Код выхода `0` — сборка прошла; ошибки компиляции скриптов и битые ссылки на ресурсы печатаются в лог (`*>` в файл, если нужен полный текст).
+
+**Запуск.** `dmengine` **игнорирует** `--config=<путь>` (пишет `WARNING:DLIB: Invalid config option` и грузит `build/default` от текущей папки). Поэтому надёжный способ — подставить свою сборку на место ожидаемого пути:
+
+```powershell
+$root = Join-Path $env:TEMP 'dca-verify'
+New-Item -ItemType Directory "$root\build" -Force | Out-Null
+# junction = сборка bob'а под именем, которое ищет движок; копировать не надо
+New-Item -ItemType Junction "$root\build\default" -Target 'G:\DCA\build\verify' | Out-Null
+
+$eng = (Get-ChildItem "$env:LOCALAPPDATA\Defold\unpack" -Recurse -Filter dmengine.exe |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+$p = Start-Process $eng -WorkingDirectory $root `
+       -RedirectStandardOutput "$root\run.out" -RedirectStandardError "$root\run.err" -PassThru
+Start-Sleep -Seconds 8
+if (-not $p.HasExited) { $p.Kill() }
+Get-Content "$root\run.err"
+
+# убрать junction иначе Remove-Item ругается на непустую папку
+cmd /c "rmdir /s /q `"$root`""
+```
+
+- В `run.out` строка `INFO:ENGINE: Loading data from: build/default` подтверждает, что грузится наша сборка.
+- `run.err` пуст → `ERROR:SCRIPT` нет. Любая ошибка Lua печатается туда целиком, со стеком (`attempt to index field 'pal'` в `init` ловился именно так).
+- Проверить поток (пришло ли сообщение, сколько записей в таблице) — временный `print` в скрипт, пересборка, запуск; после проверки `print` убрать и пересобрать.
+- Картинку глазами можно снять скриншотом окна (`System.Drawing` + `CopyFromScreen` по `MainWindowHandle`) в `build\shot.png`. Это единственный способ увидеть рендер без редактора, но проверка «на глаз» остаётся ручной (§7).
+- `build/` в `.gitignore`, артефакты проверки в коммит не попадают.
+
+**Что этот прогон не заменяет.** Он не проверяет ввод, вёрстку и поведение на устройстве — для этого нужен F5 в редакторе и Android (§6, §7). Он отвечает только за «скрипты стартуют и не падают».
+
+---
+
+## 9. Что не тестируем на этапе прототипа
 
 - Визуальные эффекты и тайминги анимаций (проверяются глазами).
 - Локализацию.

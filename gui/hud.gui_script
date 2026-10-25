@@ -41,7 +41,8 @@ function init(self)
 	make_fade("fade_top", "fade_top", 255, 0)
 	make_fade("fade_bottom", "fade_bottom", 0, 255)
 	local flash = gui.get_node("flash")
-	gui.set_color(flash, vmath.vector4(1, 0.05, 0.05, 0))
+	-- Цвет вспышки приходит из flash_cfg сообщением "flash"; здесь только прозрачность.
+	gui.set_color(flash, vmath.vector4(0, 0, 0, 0))
 	gui.set_enabled(flash, false)
 	set_overlay(false)
 end

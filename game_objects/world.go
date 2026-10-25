@@ -15,8 +15,8 @@ components {
   component: "/game_objects/flash_cfg.script"
 }
 components {
-  id: "palette_cfg"
-  component: "/game_objects/palette_cfg.script"
+  id: "palette"
+  component: "/gui/palette.gui"
 }
 components {
   id: "card_factory"
