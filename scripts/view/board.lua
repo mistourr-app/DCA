@@ -2,10 +2,13 @@
 -- Состояние — в self: rows (кэш рядов), cards (карты по координатам), rows_id (контейнер),
 -- player_go/boss_go (карты акторов). Принимает контекст-скрипт self.
 local layout = require("core.layout")
+local balance = require("core.data.balance")
 local row_gen = require("core.row_gen")
 local world = require("core.world")
 local registry = require("core.registry.init")
 local style = require("scripts.view.style")
+local naming = require("scripts.view.naming")
+local palette = require("scripts.view.palette")
 local fx = require("scripts.view.fx")
 local layers = require("scripts.view.layers")
 
@@ -62,24 +65,58 @@ function M.cell_sig(cell)
 	if cell.type == "ENEMY" then
 		return "ENEMY:" .. tostring(cell.enemy) .. ":" .. tostring(cell.hp or "")
 	end
+	if cell.type == "ATTACK_CELL" then
+		return "ATTACK_CELL:" .. tostring(cell.damage or "")
+	end
 	return cell.type
 end
 
--- Текст и цвета карты по типу клетки: символ и роли — из scripts/view/style.lua.
-function M.cell_view(self, cell)
-	local view = style[cell.type] or style.EMPTY
-	local text = view.symbol
-	if cell.type == "ENEMY" then
-		local t = registry.enemies.types[cell.enemy]
-		text = t.label:sub(1, 1) .. tostring(cell.hp or t.base_hp)
-	end
-	return text, self.pal[view.fill], self.pal[view.ink]
+-- Цвета карты по её skin: фон, текст, обводка — три роли палитры (fill_/ink_/line_).
+-- Конкретные цвета живут в gui/palette.gui (пикер GUI, §5.6), здесь только роли.
+local function colors(self, skin)
+	local fill, ink, line = palette.roles(skin)
+	return self.pal[fill], self.pal[ink], self.pal[line]
 end
 
-function M.card_msg(self, x, y, text, fill, ink)
+-- Название и значение карты + цвета. Название — из scripts/view/style.lua (у врага — из
+-- реестра, по типу), значение — данные клетки: HP, золото, лечение, урон ловушки.
+function M.cell_view(self, cell)
+	local view = style[cell.type] or style.EMPTY
+	local name = view.name
+	local value = ""
+	if cell.type == "ENEMY" then
+		local t = registry.enemies.types[cell.enemy]
+		name = naming.display_name(t.label)
+		value = tostring(cell.hp or t.base_hp)
+	elseif cell.type == "HEAL" then
+		value = tostring(balance.cells.HEAL.amount)
+	elseif cell.type == "GOLD" then
+		value = tostring(balance.cells.GOLD.amount)
+	elseif cell.type == "ATTACK_CELL" then
+		value = tostring(cell.damage or "")
+	end
+	local fill, ink, line = colors(self, view.skin)
+	return name, value, fill, ink, line
+end
+
+function M.card_msg(self, x, y, name, value, fill, ink, line)
 	local h = layout.row_height(y)
-	return { text = text, color = fill, text_color = ink,
+	return { name = name, value = value, color = fill, text_color = ink, line_color = line,
+		line_width = self.outline_width,
 		width = layout.CELL_W - self.cell_gap, height = h - self.cell_gap }
+end
+
+-- Толщина рамки карты клетки (0 — рамки нет). По ней оверлей угрозы ужимается до площади
+-- подложки, иначе подсветка закрашивает рамку вместе с фоном. Наличие рамки — Alpha узла
+-- line_<skin>; у пустых клеток она 0, поэтому их оверлей занимает всю клетку.
+function M.cell_inset(self, cell)
+	local view = style[cell and cell.type or "EMPTY"] or style.EMPTY
+	local _, _, line = palette.roles(view.skin)
+	local color = self.pal[line]
+	if color == nil or color.w <= 0 then
+		return 0
+	end
+	return self.outline_width
 end
 
 -- Клетка-карта в контейнере рядов: локальные координаты = пространство рядов.
@@ -94,9 +131,9 @@ function M.create(self, x, y, z)
 	return id
 end
 
-function M.update(self, id, x, y, z, text, fill, ink)
+function M.update(self, id, x, y, z, name, value, fill, ink, line)
 	go.set(id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), z))
-	msg.post(id, "set", M.card_msg(self, x, y, text, fill, ink))
+	msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
 end
 
 -- id карты клетки (x, y) из последней синхронизации; nil — карты нет на экране.
@@ -128,8 +165,8 @@ function M.ensure_row(self, y)
 		local cell = (row and row[x]) or { type = "EMPTY" }
 		local id = M.create(self, x, y, Z_CELL)
 		if id ~= nil then
-			local text, fill, ink = M.cell_view(self, cell)
-			msg.post(id, "set", M.card_msg(self, x, y, text, fill, ink))
+			local name, value, fill, ink, line = M.cell_view(self, cell)
+			msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
 			out[x] = { id = id, sig = M.cell_sig(cell) }
 		end
 	end
@@ -152,14 +189,14 @@ function M.sync_cells(self, pr)
 			if card == nil then
 				local id = M.create(self, x, y, Z_CELL)
 				if id ~= nil then
-					local text, fill, ink = M.cell_view(self, cell)
-					msg.post(id, "set", M.card_msg(self, x, y, text, fill, ink))
+					local name, value, fill, ink, line = M.cell_view(self, cell)
+					msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
 					card = { id = id, sig = sig }
 				end
 			elseif card.sig ~= sig then
 				go.set(card.id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), Z_CELL))
-				local text, fill, ink = M.cell_view(self, cell)
-				msg.post(card.id, "set", M.card_msg(self, x, y, text, fill, ink))
+				local name, value, fill, ink, line = M.cell_view(self, cell)
+				msg.post(card.id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
 				card.sig = sig
 			end
 			out[x] = card
@@ -201,8 +238,11 @@ function M.sync_player(self, pr)
 	go.set(self.player_go, "position",
 		vmath.vector3(layout.cell_x(pos.x), layout.world_center(pr), Z_ACTOR))
 	local view = style.PLAYER
+	local p = self.player
+	local fill, ink, line = colors(self, view.skin)
 	msg.post(self.player_go, "set",
-		M.card_msg(self, pos.x, pr, view.symbol, self.pal[view.fill], self.pal[view.ink]))
+		M.card_msg(self, pos.x, pr, view.name, string.format("%d/%d", p.hp, p.max_hp),
+			fill, ink, line))
 end
 
 -- Карта босса: отдельный объект на верхнем ряду арены. Показывается уже в preview,
@@ -233,8 +273,9 @@ function M.sync_boss(self, pr)
 		return
 	end
 	local view = style.BOSS
+	local fill, ink, line = colors(self, view.skin)
 	M.update(self, self.boss_go, a.boss_x, boss_y, Z_ACTOR,
-		view.symbol .. tostring(a.boss_hp), self.pal[view.fill], self.pal[view.ink])
+		view.name, tostring(a.boss_hp), fill, ink, line)
 end
 
 -- Прокрутка контейнера рядов, diff клеток, карты акторов, очистка эфемерных ГО.

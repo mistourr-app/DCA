@@ -15,7 +15,7 @@ local function empty_row()
 	return r
 end
 
-M["free step is a step, a jump is a jump, an enemy is an attack"] = function(t)
+M["free step is a step, a jump is a jump, an enemy is not outlined"] = function(t)
 	local above = empty_row()
 	above[2] = { type = "EMPTY" }
 	above[4] = { type = "GOLD" }
@@ -25,7 +25,7 @@ M["free step is a step, a jump is a jump, an enemy is an attack"] = function(t)
 		kinds[m.x] = m.kind
 	end
 	t.equal(kinds[2], "step", "прямо вверх — шаг")
-	t.equal(kinds[1], "attack", "враг на соседней колонке — атака")
+	t.equal(kinds[1], nil, "клетку врага не обводим — у карты врага своя рамка")
 	t.equal(kinds[3], "step", "пустая колонка рядом — шаг")
 end
 
@@ -144,19 +144,20 @@ M["dash points are evenly spaced between the endpoints"] = function(t)
 	t.equal(pts[4].x, 80, "последняя точка")
 end
 
-M["arena moves: adjacent is step, far is jump, attack cell is attack"] = function(t)
+M["arena moves: adjacent is step, far is jump, an attack cell is outlined as a move"] = function(t)
 	local a = { turn = "player", player_x = 2, player_hp = 20, player_row = {}, boss_x = 2, fired = false }
 	for x = 0, COLUMNS - 1 do
 		a.player_row[x] = { type = "EMPTY" }
 	end
 	a.player_row[3] = { type = "ATTACK_CELL", damage = 5 }
+	a.player_row[0] = { type = "ATTACK_CELL", damage = 5 }
 	local byx = {}
 	for _, m in ipairs(highlight.arena_moves(a)) do
 		byx[m.x] = m.kind
 	end
 	t.equal(byx[1], "step", "сосед слева — шаг")
-	t.equal(byx[3], "attack", "клетка атаки — атака")
-	t.equal(byx[0], "jump", "через колонку — прыжок")
+	t.equal(byx[3], "step", "клетка атаки рядом — шаг: снаружи только перемещение")
+	t.equal(byx[0], "jump", "клетка атаки через колонку — прыжок")
 	t.equal(byx[4], "jump", "правый край — прыжок")
 	t.equal(byx[2], nil, "своя клетка не подсвечивается")
 end

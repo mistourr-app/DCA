@@ -1,6 +1,17 @@
--- Клетка-карта: прямоугольник-подложка (sprite) и надпись (label). Сообщение "set":
---   width, height (в логических px), color (фон), text, text_color.
--- Масштаб применяется только спрайту: label масштабить нельзя — растянется текст.
+-- Клетка-карта: обводка (border), прямоугольник-подложка (sprite) и две подписи —
+-- название (name) и значение (value) под ним. Сообщение "set": width, height (в логических px),
+-- color (фон), line_color (обводка), line_width (её толщина), name, value, text_color.
+-- Обводка — второй спрайт того же изображения: он лежит под подложкой и виден только
+-- полосой по краю. Рамка стоит ВНУТРИ габарита карты: подложка ужимается на её толщину,
+-- поэтому карта с обводкой не больше клетки, а соседние карты не соприкасаются.
+-- У спрайта в Defold нет собственной обводки (docs/ENGINE_DEFOLD.md §3b), поэтому толщина
+-- приходит числом line_width из geom_cfg (инспектор мира), а цвет — из палитры вместе
+-- с фоном и текстом. Тем же числом мир ужимает оверлей угрозы, чтобы рамка оставалась
+-- видимой; отступ считает core/layout.card_inset — один расчёт на карту и подсветку.
+-- Прозрачная обводка (alpha = 0, так у line_empty) — карта без рамки на всю площадь.
+-- Масштаб применяется к подложке, обводке и обеим подписям сразу (anim.lift): при подъёме
+-- карта растёт целиком, текст не «отклеивается» от неё.
+-- Расстояние между строками задано позициями компонентов в card.go (инспектор).
 -- Параметры анимаций заданы явно в card.go; здесь — те же значения как база для новых прототипов.
 -- Примитивы lift/lunge/fall/flash — в scripts/view/anim.lua; здесь остаётся протокол сообщений.
 -- Сообщения (по завершении шлют отправителю "anim_done" {token}):
@@ -13,6 +24,7 @@
 -- Параметры анимаций: те же значения, что в card.go (правятся в инспекторе прототипа).
 -- flash_color — vector4: x = red, y = green, z = blue, w = alpha (поля X/Y/Z/W в инспекторе).
 local anim = require("scripts.view.anim")
+local layout = require("core.layout")
 
 go.property("lift_scale", 1.25)
 go.property("lunge_ms", 150)
@@ -21,12 +33,15 @@ go.property("flash_ms", 100)
 go.property("flash_color", vmath.vector4(1, 1, 1, 1))
 
 local SPRITE_PX = 32
+local ONE = vmath.vector3(1, 1, 1)
 
 function init(self)
 	-- Абсолютные url компонентов: anim.lua — обычный модуль без своего GO,
-	-- относительные "#sprite"/"." вне скрипта не резолвятся.
+	-- относительные "#sprite"/"." резолвятся только в скрипте-GO.
 	self.sprite_url = msg.url("#sprite")
-	self.label_url = msg.url("#label")
+	self.border_url = msg.url("#border")
+	self.name_url = msg.url("#name")
+	self.value_url = msg.url("#value")
 	self.root_url = msg.url(".")
 end
 
@@ -34,22 +49,49 @@ function on_message(self, message_id, message, sender)
 	if message_id == hash("set") then
 		go.cancel_animations(self.sprite_url, "scale")
 		go.cancel_animations(self.sprite_url, "tint")
-		go.cancel_animations(self.label_url, "color")
+		go.cancel_animations(self.border_url, "scale")
+		go.cancel_animations(self.border_url, "tint")
+		go.cancel_animations(self.name_url, "color")
+		go.cancel_animations(self.name_url, "scale")
+		go.cancel_animations(self.value_url, "color")
+		go.cancel_animations(self.value_url, "scale")
 		go.cancel_animations(self.root_url, "position")
-		self.base = vmath.vector3(message.width / SPRITE_PX, message.height / SPRITE_PX, 1)
 		self.color = message.color
+		self.line_color = message.line_color or vmath.vector4(0, 0, 0, 0)
+		-- Габарит карты — message.width/height: обводка занимает line_width по краю
+		-- внутрь, подложка — остальное. Прозрачная обводка рамки не рисует и не ужимает
+		-- подложку. Рамка не толще половины карты — иначе подложки не осталось бы.
+		local inset = 0
+		if self.line_color.w > 0 then
+			inset = layout.card_inset(message.width, message.height, message.line_width or 0)
+		end
+		self.base = vmath.vector3((message.width - 2 * inset) / SPRITE_PX,
+			(message.height - 2 * inset) / SPRITE_PX, 1)
+		self.border_base = vmath.vector3(message.width / SPRITE_PX, message.height / SPRITE_PX, 1)
 		go.set(self.sprite_url, "scale", self.base)
-		go.set(self.sprite_url, "tint", message.color)
-		go.set(self.label_url, "color", message.text_color)
-		go.set(self.label_url, "text", message.text)
+		go.set(self.sprite_url, "tint", self.color)
+		go.set(self.border_url, "scale", self.border_base)
+		go.set(self.border_url, "tint", self.line_color)
+		go.set(self.name_url, "color", message.text_color)
+		go.set(self.name_url, "scale", ONE)
+		go.set(self.name_url, "text", message.name or "")
+		go.set(self.value_url, "color", message.text_color)
+		go.set(self.value_url, "scale", ONE)
+		go.set(self.value_url, "text", message.value or "")
 	elseif message_id == hash("lift") then
-		anim.lift({ sprite = self.sprite_url, base = self.base,
-			ms = message.duration, scale = self.lift_scale })
+		anim.lift({ ms = message.duration, scale = self.lift_scale, parts = {
+			{ url = self.sprite_url, base = self.base },
+			{ url = self.border_url, base = self.border_base },
+			{ url = self.name_url, base = ONE },
+			{ url = self.value_url, base = ONE },
+		} })
 	elseif message_id == hash("lunge") then
 		anim.lunge({ root = self.root_url, offset = message.offset, ms = self.lunge_ms,
 			done = function() msg.post(sender, "anim_done", { token = message.token }) end })
 	elseif message_id == hash("fall") then
-		anim.fall({ root = self.root_url, sprite = self.sprite_url, label = self.label_url,
+		anim.fall({ root = self.root_url, sprite = self.sprite_url,
+			border = self.border_url, border_color = self.line_color,
+			labels = { self.name_url, self.value_url },
 			offset = message.offset, ms = self.fall_ms, color = self.color,
 			done = function() msg.post(sender, "anim_done", { token = message.token }) end })
 	elseif message_id == hash("flash") then

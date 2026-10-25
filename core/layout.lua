@@ -72,6 +72,17 @@ function M.cell_x(x)
 	return x * M.CELL_W + M.CELL_W / 2
 end
 
+-- Внутренний отступ карты: рамка занимает border px по краю, но не толще половины меньшей
+-- стороны (иначе подложки не осталось бы). 0 — рамки нет (прозрачная обводка).
+-- Один расчёт на подложку (card.script) и оверлей угрозы (fx.threat): их площади обязаны
+-- совпадать, иначе подсветка снова закрашивает рамку.
+function M.card_inset(width, height, border)
+	if border == nil or border <= 0 then
+		return 0
+	end
+	return math.min(border, math.min(width, height) / 2)
+end
+
 -- Видимые ряды от ряда игрока вверх: ряд входит, если его нижний край начался в поле.
 -- Верхний ряд может быть виден частично (переход к высокой арене), дальше — туман войны.
 function M.visible_rows(player_row)

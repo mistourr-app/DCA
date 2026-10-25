@@ -143,4 +143,13 @@ M["taps outside the field return nil"] = function(t)
 	t.equal(layout.cell_at(10, layout.HEIGHT - 5, 0), nil, "над полем (HUD)")
 end
 
+-- Тот же отступ ужимает подложку карты и оверлей угрозы (fx.threat): рамка не уходит под подсветку.
+M["card_inset keeps the frame inside the card"] = function(t)
+	t.equal(layout.card_inset(136, 136, 3), 3, "обычная толщина рамки")
+	t.equal(layout.card_inset(136, 300, 10), 10, "по меньшей стороне")
+	t.equal(layout.card_inset(136, 136, 0), 0, "прозрачная обводка — без отступа")
+	t.equal(layout.card_inset(136, 136, nil), 0, "толщина не задана — без отступа")
+	t.equal(layout.card_inset(136, 136, 500), 68, "не толще половины меньшей стороны")
+end
+
 return M

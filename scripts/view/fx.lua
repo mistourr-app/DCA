@@ -48,8 +48,13 @@ function M.dashed(self, ax, ay, bx, by)
 end
 
 -- Оверлей угрозы поверх клетки: цвет с заданной непрозрачностью, в своём слое z.
-function M.threat(self, cx, cy, h, color, alpha, z)
-	M.bar(self, cx, cy, layout.CELL_W - self.cell_gap, h - self.cell_gap,
+-- inset — толщина рамки карты: оверлей покрывает только площадь подложки, поэтому рамка
+-- остаётся видимой при любой непрозрачности (иначе подсветка закрашивает её вместе с фоном).
+function M.threat(self, cx, cy, h, color, alpha, z, inset)
+	local w = layout.CELL_W - self.cell_gap
+	local ch = h - self.cell_gap
+	local pad = layout.card_inset(w, ch, inset or 0)
+	M.bar(self, cx, cy, w - 2 * pad, ch - 2 * pad,
 		vmath.vector4(color.x, color.y, color.z, alpha), z)
 end
 

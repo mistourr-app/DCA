@@ -52,9 +52,10 @@ local GEOM_CFG = "#geom_cfg"
 local ANIM_CFG = "#anim_cfg"
 local FLASH_CFG = "#flash_cfg"
 
--- Вид хода -> роль палитры для обводки.
+-- Вид хода -> роль палитры для обводки. Обводится только перемещение:
+-- цвет рамки не кодирует тип клетки (ловушка, враг — по своей карте).
 local OUTLINE_KEY = {
-	step = "outline_step", jump = "outline_jump", attack = "outline_attack",
+	step = "outline_step", jump = "outline_jump",
 }
 
 -- Чтение config-компонентов один раз при старте. Значения go.property — константы сборки,
@@ -62,6 +63,7 @@ local OUTLINE_KEY = {
 local function read_config(self)
 	self.cell_gap = go.get(GEOM_CFG, "cell_gap")
 	self.border_width = go.get(GEOM_CFG, "border_width")
+	self.outline_width = go.get(GEOM_CFG, "outline_width")
 	self.dash_step = go.get(GEOM_CFG, "dash_step")
 	self.dash_size = go.get(GEOM_CFG, "dash_size")
 	self.move_ms = go.get(ANIM_CFG, "move_ms")
@@ -87,8 +89,10 @@ local function check_palette(self)
 		need("полного набора scripts/view/palette.lua", key)
 	end
 	for type_, view in pairs(style) do
-		need("fill " .. type_, view.fill)
-		need("ink " .. type_, view.ink)
+		local fill, ink, line = palette.roles(view.skin)
+		need("fill " .. type_, fill)
+		need("ink " .. type_, ink)
+		need("line " .. type_, line)
 	end
 	for _, key in pairs(OUTLINE_KEY) do
 		need("outline", key)
@@ -152,24 +156,28 @@ local function refresh(self)
 	board.refresh(self)
 	-- Слой угроз: поверх клеток, под персонажами и содержимым (GDD §5.4).
 	for _, y in ipairs(layout.visible_rows(pr)) do
-		local vision_row = highlight.vision(board.content_row(self, y), y)
+		local row = board.content_row(self, y)
+		local vision_row = highlight.vision(row, y)
 		local cy = layout.world_center(y)
 		local h = layout.row_height(y)
 		for x = 0, layout.COLUMNS - 1 do
 			local alpha = highlight.vision_alpha(vision_row[x])
 			if alpha ~= nil then
+				-- Оверлей ужимается на толщину рамки карты: подсветка закрывает подложку,
+				-- но не рамку (иначе она пропадает тем сильнее, чем непрозрачнее слой).
+				local inset = board.cell_inset(self, row and row[x])
 				if y == pr and x == self.world.pos.x and self.world.mode == MODES.WORLD then
 					-- Игрок в поле зрения: его клетка красная, над заливкой клетки и под картой персонажа.
-					fx.threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED)
+					fx.threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED, inset)
 				else
-					fx.threat(self, layout.cell_x(x), cy, h, self.pal.vision, alpha, Z_THREAT)
+					fx.threat(self, layout.cell_x(x), cy, h, self.pal.vision, alpha, Z_THREAT, inset)
 				end
 			end
 		end
 	end
 	local reach = registry.equipment.CROSSBOW.range
 	if self.world.mode == MODES.WORLD then
-		-- Подсветка ходов на следующий ряд (шаг, прыжок, атака по врагу).
+		-- Подсветка ходов на следующий ряд (шаг, прыжок). Враги не обводятся: у карты своя рамка.
 		local up_y = pr + 1
 		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, board.get_row(self, up_y))) do
 			fx.outline(self, layout.cell_x(m.x), layout.world_center(up_y),
@@ -182,6 +190,7 @@ local function refresh(self)
 		end
 	elseif self.world.mode == MODES.BOSS and self.arena ~= nil then
 		-- Подсветка ходов по X на ряду игрока и пунктир выстрела по боссу.
+		-- Клетки-ловушки обводятся как обычные ходы: снаружи — только индикация перемещения.
 		local a = self.arena
 		for _, m in ipairs(highlight.arena_moves(a)) do
 			fx.outline(self, layout.cell_x(m.x), layout.world_center(pr),

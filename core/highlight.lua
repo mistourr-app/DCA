@@ -1,7 +1,11 @@
 -- Подсказки на поле (GDD §5.4, §12). Чистая логика: возвращает данные, рисует collections/world.script.
 --
--- Обводки ходов: step (зелёная) — бесплатный шаг, jump (фиолетовая) — прыжок за HP,
---   attack (красная) — ближний бой с врагом на следующем ряду.
+-- Обводки ходов: step (зелёная) — бесплатный шаг, jump (фиолетовая) — прыжок за HP.
+--   Снаружи обводится только перемещение: клетки, куда можно пойти. Клетки врагов
+--   в подсказки не попадают — у карты врага уже есть своя рамка, вторая обводка вокруг
+--   неё читалась как лишняя. Ход на врага при этом остаётся обычным ходом
+--   (movement.options). Клетки-ловушки арены обводятся как обычные ходы: их тип виден
+--   по собственной карте, а не по цвету внешней рамки.
 -- Пунктир выстрела: рисуется до каждой цели, в которую выстрел возможен (есть заряд,
 --   цель в дальности, линия не перекрыта стеной). Если выстрел невозможен — ничего.
 -- Зрение врагов: оранжевым помечаются все клетки, которые видит хотя бы один враг своего ряда.
@@ -27,17 +31,18 @@ local function wall_fn(row)
 	end
 end
 
--- Ходы на следующий ряд: { x, y, kind = "step" | "jump" | "attack" }.
+-- Ходы на следующий ряд: { x, y, kind = "step" | "jump" }. Клетки врагов пропускаются:
+-- их карта обводится собственной рамкой (line_enemy), внешняя подсказка не нужна.
 function M.moves(pos, hp, row_above)
 	local out = {}
 	for _, o in ipairs(movement.options(pos, hp, row_above)) do
-		local kind = "jump"
-		if o.cell_type == "ENEMY" then
-			kind = "attack"
-		elseif o.cost == 0 then
-			kind = "step"
+		if o.cell_type ~= "ENEMY" then
+			local kind = "jump"
+			if o.cost == 0 then
+				kind = "step"
+			end
+			table.insert(out, { x = o.x, y = o.y, kind = kind })
 		end
-		table.insert(out, { x = o.x, y = o.y, kind = kind })
 	end
 	return out
 end
@@ -110,8 +115,10 @@ function M.dash_points(ax, ay, bx, by, step)
 	return out
 end
 
--- Арена: ходы по X на своем ряду. Соседняя колонка — step, дальше — jump (стоит HP),
--- клетка атаки — attack. Недоступные прыжки (HP − стоимость < 1) не подсвечиваются.
+-- Арена: ходы по X на своем ряду. Соседняя колонка — step, дальше — jump (стоит HP).
+-- Вид клетки на обводку не влияет: рамка снаружи означает только «сюда можно пойти»,
+-- поэтому клетка-ловушка обводится как шаг или прыжок. Недоступные прыжки
+-- (HP − стоимость < 1) не подсвечиваются.
 function M.arena_moves(a)
 	local out = {}
 	if a.turn ~= "player" then
@@ -121,11 +128,8 @@ function M.arena_moves(a)
 		if x ~= a.player_x then
 			local cost = math.max(0, math.abs(x - a.player_x) - 1)
 			if a.player_hp - cost >= 1 then
-				local c = a.player_row[x] or { type = "EMPTY" }
 				local kind = "jump"
-				if c.type == "ATTACK_CELL" then
-					kind = "attack"
-				elseif cost == 0 then
+				if cost == 0 then
 					kind = "step"
 				end
 				table.insert(out, { x = x, kind = kind, cost = cost })

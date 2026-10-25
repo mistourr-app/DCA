@@ -1,11 +1,27 @@
 components {
+  id: "border"
+  component: "/game_objects/cell_sprite.sprite"
+  position {
+    z: -0.01
+  }
+}
+components {
   id: "sprite"
   component: "/game_objects/cell_sprite.sprite"
 }
 components {
-  id: "label"
+  id: "name"
+  component: "/game_objects/cell_name.label"
+  position {
+    y: 30.0
+    z: 0.2
+  }
+}
+components {
+  id: "value"
   component: "/game_objects/cell_label.label"
   position {
+    y: -22.0
     z: 0.2
   }
 }
