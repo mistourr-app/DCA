@@ -54,6 +54,13 @@ jobs:
           fi
           ls -la site | head -30
 
+      - name: Flatten bundle to site root
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          cp -r bundle/html5/* site/
+          ls -la site
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
