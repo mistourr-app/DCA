@@ -1,14 +1,15 @@
--- Клетка-карта: обводка (border), прямоугольник-подложка (sprite) и две подписи —
+-- Клетка-карта: рамка (border), прямоугольник-подложка (sprite) и две подписи —
 -- название (name) и значение (value) под ним. Сообщение "set": width, height (в логических px),
--- color (фон), line_color (обводка), line_width (её толщина), name, value, text_color.
--- Обводка — второй спрайт того же изображения: он лежит под подложкой и виден только
--- полосой по краю. Рамка стоит ВНУТРИ габарита карты: подложка ужимается на её толщину,
--- поэтому карта с обводкой не больше клетки, а соседние карты не соприкасаются.
+-- color (фон), border_color (рамка), border_width (её толщина), name, value, text_color.
+-- Рамка — индикация хода, а не цвет карты: зелёная — шаг, фиолетовая — прыжок, прозрачная —
+-- хода на клетку нет. Поэтому у карты нет «своей» обводки: её задаёт scripts/view/board.lua
+-- по board.update_moves. Рамка стоит ВНУТРИ габарита карты: подложка ужимается на её толщину,
+-- поэтому карта с рамкой не больше клетки, а соседние карты не соприкасаются.
 -- У спрайта в Defold нет собственной обводки (docs/ENGINE_DEFOLD.md §3b), поэтому толщина
--- приходит числом line_width из geom_cfg (инспектор мира), а цвет — из палитры вместе
--- с фоном и текстом. Тем же числом мир ужимает оверлей угрозы, чтобы рамка оставалась
+-- приходит числом border_width из geom_cfg.card_border (инспектор мира), а цвет — из палитры
+-- (border_step/border_jump). Тем же числом мир ужимает оверлей угрозы, чтобы рамка оставалась
 -- видимой; отступ считает core/layout.card_inset — один расчёт на карту и подсветку.
--- Прозрачная обводка (alpha = 0, так у line_empty) — карта без рамки на всю площадь.
+-- Прозрачная рамка (alpha = 0) — карта без рамки на всю площадь.
 -- Масштаб применяется к подложке, обводке и обеим подписям сразу (anim.lift): при подъёме
 -- карта растёт целиком, текст не «отклеивается» от неё.
 -- Расстояние между строками задано позициями компонентов в card.go (инспектор).
@@ -57,13 +58,13 @@ function on_message(self, message_id, message, sender)
 		go.cancel_animations(self.value_url, "scale")
 		go.cancel_animations(self.root_url, "position")
 		self.color = message.color
-		self.line_color = message.line_color or vmath.vector4(0, 0, 0, 0)
-		-- Габарит карты — message.width/height: обводка занимает line_width по краю
-		-- внутрь, подложка — остальное. Прозрачная обводка рамки не рисует и не ужимает
+		self.border_color = message.border_color or vmath.vector4(0, 0, 0, 0)
+		-- Габарит карты — message.width/height: рамка занимает border_width по краю
+		-- внутрь, подложка — остальное. Прозрачная рамка не рисуется и не ужимает
 		-- подложку. Рамка не толще половины карты — иначе подложки не осталось бы.
 		local inset = 0
-		if self.line_color.w > 0 then
-			inset = layout.card_inset(message.width, message.height, message.line_width or 0)
+		if self.border_color.w > 0 then
+			inset = layout.card_inset(message.width, message.height, message.border_width or 0)
 		end
 		self.base = vmath.vector3((message.width - 2 * inset) / SPRITE_PX,
 			(message.height - 2 * inset) / SPRITE_PX, 1)
@@ -71,7 +72,7 @@ function on_message(self, message_id, message, sender)
 		go.set(self.sprite_url, "scale", self.base)
 		go.set(self.sprite_url, "tint", self.color)
 		go.set(self.border_url, "scale", self.border_base)
-		go.set(self.border_url, "tint", self.line_color)
+		go.set(self.border_url, "tint", self.border_color)
 		go.set(self.name_url, "color", message.text_color)
 		go.set(self.name_url, "scale", ONE)
 		go.set(self.name_url, "text", message.name or "")
@@ -90,7 +91,7 @@ function on_message(self, message_id, message, sender)
 			done = function() msg.post(sender, "anim_done", { token = message.token }) end })
 	elseif message_id == hash("fall") then
 		anim.fall({ root = self.root_url, sprite = self.sprite_url,
-			border = self.border_url, border_color = self.line_color,
+			border = self.border_url, border_color = self.border_color,
 			labels = { self.name_url, self.value_url },
 			offset = message.offset, ms = self.fall_ms, color = self.color,
 			done = function() msg.post(sender, "anim_done", { token = message.token }) end })

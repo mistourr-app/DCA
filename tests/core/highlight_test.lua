@@ -15,7 +15,7 @@ local function empty_row()
 	return r
 end
 
-M["free step is a step, a jump is a jump, an enemy is not outlined"] = function(t)
+M["free step is a step, a jump is a jump, an enemy step is a step"] = function(t)
 	local above = empty_row()
 	above[2] = { type = "EMPTY" }
 	above[4] = { type = "GOLD" }
@@ -25,7 +25,7 @@ M["free step is a step, a jump is a jump, an enemy is not outlined"] = function(
 		kinds[m.x] = m.kind
 	end
 	t.equal(kinds[2], "step", "прямо вверх — шаг")
-	t.equal(kinds[1], nil, "клетку врага не обводим — у карты врага своя рамка")
+	t.equal(kinds[1], "step", "клетку врага обводим: ход на него разрешён — это шаг")
 	t.equal(kinds[3], "step", "пустая колонка рядом — шаг")
 end
 

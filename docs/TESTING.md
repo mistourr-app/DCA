@@ -7,8 +7,8 @@
 | Ядро (`core/`) | правила, генерация рядов, бой, лагерь, смерть, сохранения | `luajit tests/run.lua` (вне движка) | перед каждым коммитом |
 | Реестры | уникальность ключей, обязательные поля, ссылки на CSV | `tests/registry_test.lua` | перед каждым коммитом сущностей |
 | Слои отрисовки | порядок z: клетки < подсветки < карты < пунктир < цифры | `tests/view/layers_test.lua` | при правке `layers.lua` и эффектов |
-| Палитра | три роли (`fill_/ink_/line_`) каждого `skin` покрыты `palette.KEYS`, ключи уникальны | `tests/view/palette_test.lua` | при правке `style.lua`/`palette.lua`/`palette.gui` |
-| Карты | у каждого типа есть название и свой `skin`; имя, HP, золото, лечение и урон собираются в две строки; цвета фона/текста/обводки на месте | `tests/view/style_test.lua`, `tests/view/cards_test.lua` | при правке `style.lua`/`naming.lua`/`board.lua` |
+| Палитра | две роли (`fill_/ink_`) каждого `skin` и рамки хода (`border_step`/`border_jump`) покрыты `palette.KEYS`, ключи уникальны | `tests/view/palette_test.lua` | при правке `style.lua`/`palette.lua`/`palette.gui` |
+| Карты | у каждого типа есть название и свой `skin`; имя, HP, золото, лечение и урон собираются в две строки; цвета фона/текста на месте; рамка — по виду хода (шаг/прыжок/нет) | `tests/view/style_test.lua`, `tests/view/cards_test.lua` | при правке `style.lua`/`naming.lua`/`board.lua` |
 | Баланс | CSV ↔ `core/data/*.lua` | `python tools/build_balance.py --check` | перед каждым коммитом баланса |
 | Сборка | проект компилируется, ссылки на ресурсы целы | Build в редакторе 1.14.0 | перед коммитом изменений `.collection`, `.go`, `.gui` |
 | Загрузка | коллекции и GUI загружаются без ошибок | запуск в редакторе, лог без `ERROR` | перед коммитом изменений коллекций |

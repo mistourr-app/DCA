@@ -7,11 +7,11 @@ M["z: поле под подсветками"] = function(t)
 	t.true_(layers.CELL_FILL < layers.THREAT, "клетки под слоем угрозы")
 	t.true_(layers.THREAT < layers.SPOTTED, "угроза под «вас видят»")
 	t.true_(layers.SPOTTED < layers.CELL_INK, "«вас видят» под подписью клетки")
-	t.true_(layers.CELL_INK < layers.OUTLINE, "подпись клетки под обводкой")
+	t.true_(layers.CELL_INK < layers.ACTOR, "подпись клетки под картой актёра")
 end
 
 M["z: карты над подсветками"] = function(t)
-	t.true_(layers.OUTLINE < layers.ACTOR, "обводки под картами актёров")
+	t.true_(layers.SPOTTED < layers.ACTOR, "подсветки под картами актёров")
 	t.true_(layers.ACTOR < layers.ACTOR_INK, "карта актёра под своей подписью")
 end
 

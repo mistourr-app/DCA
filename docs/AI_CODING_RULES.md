@@ -180,8 +180,8 @@ collections, game_objects, gui   ──▶  scripts/  ──▶  core/  ──�
 |---|---|---|
 | Правила игры: HP, урон, шансы, цены, кривые, период боссов | `balance/balance.csv` → `core/data/balance.lua` | текстовый редактор / таблицы; код читает только generated-файл |
 | Числа, которые читает `core/` (геометрия `screen.*`, `screen.threatAlpha`) | `design/design.csv` → `core/data/design.lua` | то же. Причина: `core/` не видит Defold и `go.property` |
-| Экран: длительности анимаций, размеры обводок/пунктира, разброс цифр, толщина обводки карты | `go.property` скрипта экрана (`anim_cfg.script`, `geom_cfg.script`, `flash_cfg.script`, `card.script`, `popup.script`) | инспектор Defold (значение пишется в `.go`/`.collection`) или тот же файл руками |
-| Цвета карт и эффектов (32 роли: фон/текст/обводка каждой карты + подсветки) | узлы `gui/palette.gui` (`enabled: false`), список ролей — `scripts/view/palette.lua` | GUI-редактор: пикер RGBA/hex и поле Alpha у узла (Alpha обводки = её наличие). Причина: у `go.property` пикера нет, только X/Y/Z/W (`docs/ENGINE_DEFOLD.md` §3b) |
+| Экран: длительности анимаций, размеры пунктира, разброс цифр, толщина рамки карты | `go.property` скрипта экрана (`anim_cfg.script`, `geom_cfg.script`, `flash_cfg.script`, `card.script`, `popup.script`) | инспектор Defold (значение пишется в `.go`/`.collection`) или тот же файл руками |
+| Цвета карт и эффектов (23 роли: фон/текст каждой карты + рамки хода, пунктир, угрозы) | узлы `gui/palette.gui` (`enabled: false`), список ролей — `scripts/view/palette.lua` | GUI-редактор: пикер RGBA/hex и поле Alpha у узла. Причина: у `go.property` пикера нет, только X/Y/Z/W (`docs/ENGINE_DEFOLD.md` §3b). Обводки (рамки) карт — тоже отсюда: `border_step`/`border_jump` |
 
 - Сгенерированные файлы не редактировать руками. Изменение баланса: править CSV → `python tools/build_balance.py` → `lua tests/run.lua`.
 - Новый параметр добавляется сначала в источник (CSV или объявление property), потом в код. Код не читает параметр, которого нет в источнике.

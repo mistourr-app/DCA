@@ -6,6 +6,7 @@ local balance = require("core.data.balance")
 local row_gen = require("core.row_gen")
 local world = require("core.world")
 local registry = require("core.registry.init")
+local highlight = require("core.highlight")
 local style = require("scripts.view.style")
 local naming = require("scripts.view.naming")
 local palette = require("scripts.view.palette")
@@ -22,6 +23,11 @@ local Z_ACTOR = layers.ACTOR
 local M = {}
 M.Z_CELL = Z_CELL
 M.Z_ACTOR = Z_ACTOR
+
+-- Вид хода -> роль палитры для рамки карты. Рамка означает только «сюда можно пойти»;
+-- самостоятельного цвета у рамки карты нет (GDD §5.4).
+local BORDER_KEY = { step = "border_step", jump = "border_jump" }
+M.BORDER_KEY = BORDER_KEY
 
 -- Клетки ряда y; ряд генерируется по seed при первом обращении и кэшируется.
 function M.get_row(self, y)
@@ -71,11 +77,38 @@ function M.cell_sig(cell)
 	return cell.type
 end
 
--- Цвета карты по её skin: фон, текст, обводка — три роли палитры (fill_/ink_/line_).
--- Конкретные цвета живут в gui/palette.gui (пикер GUI, §5.6), здесь только роли.
+-- Куда можно пойти: { [y] = { [x] = "step" | "jump" } }. В мире — следующий ряд, в бою
+-- с боссом — ряд игрока (ходы по X). Считается перед отрисовкой карт: рамка карты — та же
+-- индикация хода, отдельных обводок вокруг клеток нет.
+function M.update_moves(self)
+	local out = {}
+	local pr = self.world.pos.y
+	if self.world.mode == MODES.BOSS and self.arena ~= nil then
+		for _, m in ipairs(highlight.arena_moves(self.arena)) do
+			out[pr] = out[pr] or {}
+			out[pr][m.x] = m.kind
+		end
+	else
+		local up = pr + 1
+		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, M.get_row(self, up))) do
+			out[up] = out[up] or {}
+			out[up][m.x] = m.kind
+		end
+	end
+	self.moves = out
+end
+
+-- Вид хода на клетке (x, y); nil — клетка не цель хода, значит рамки у её карты нет.
+function M.move_kind(self, x, y)
+	local row = self.moves and self.moves[y]
+	return row and row[x] or nil
+end
+
+-- Цвета карты по её skin: фон и текст (fill_/ink_). Рамка — не цвет карты: её цвет задаёт
+-- вид хода (border_step/border_jump), поэтому у разных карт с одним ходом рамка одного цвета.
 local function colors(self, skin)
-	local fill, ink, line = palette.roles(skin)
-	return self.pal[fill], self.pal[ink], self.pal[line]
+	local fill, ink = palette.roles(skin)
+	return self.pal[fill], self.pal[ink]
 end
 
 -- Название и значение карты + цвета. Название — из scripts/view/style.lua (у врага — из
@@ -95,28 +128,41 @@ function M.cell_view(self, cell)
 	elseif cell.type == "ATTACK_CELL" then
 		value = tostring(cell.damage or "")
 	end
-	local fill, ink, line = colors(self, view.skin)
-	return name, value, fill, ink, line
+	local fill, ink = colors(self, view.skin)
+	return name, value, fill, ink
 end
 
-function M.card_msg(self, x, y, name, value, fill, ink, line)
+-- Цвет рамки по виду хода: nil — рамки нет (card.script подставит прозрачный цвет).
+local function border_color(self, kind)
+	if kind == nil then
+		return nil
+	end
+	return self.pal[BORDER_KEY[kind]]
+end
+
+-- Сообщение "set" карте: содержимое, цвета и рамка. Толщина рамки одна на все карты —
+-- card_border из geom_cfg; приходит и оверлею угрозы через board.cell_inset.
+function M.card_msg(self, x, y, name, value, fill, ink, kind)
 	local h = layout.row_height(y)
-	return { name = name, value = value, color = fill, text_color = ink, line_color = line,
-		line_width = self.outline_width,
+	return { name = name, value = value, color = fill, text_color = ink,
+		border_color = border_color(self, kind),
+		border_width = self.card_border,
 		width = layout.CELL_W - self.cell_gap, height = h - self.cell_gap }
 end
 
--- Толщина рамки карты клетки (0 — рамки нет). По ней оверлей угрозы ужимается до площади
--- подложки, иначе подсветка закрашивает рамку вместе с фоном. Наличие рамки — Alpha узла
--- line_<skin>; у пустых клеток она 0, поэтому их оверлей занимает всю клетку.
-function M.cell_inset(self, cell)
-	local view = style[cell and cell.type or "EMPTY"] or style.EMPTY
-	local _, _, line = palette.roles(view.skin)
-	local color = self.pal[line]
-	if color == nil or color.w <= 0 then
+-- Толщина рамки карты (0 — рамки нет): по ней оверлей угрозы ужимается до площади подложки,
+-- иначе подсветка закрашивает рамку вместе с фоном. Рамка есть только у карт, куда можно пойти.
+function M.cell_inset(self, x, y)
+	if M.move_kind(self, x, y) == nil then
 		return 0
 	end
-	return self.outline_width
+	return self.card_border
+end
+
+-- Подпись карты для diff-синхронизации: содержимое и вид хода. Рамка может измениться
+-- без смены клетки (игрок шагнул), поэтому вид хода входит в подпись.
+local function card_sig(cell, kind)
+	return M.cell_sig(cell) .. "|" .. (kind or "-")
 end
 
 -- Клетка-карта в контейнере рядов: локальные координаты = пространство рядов.
@@ -131,9 +177,9 @@ function M.create(self, x, y, z)
 	return id
 end
 
-function M.update(self, id, x, y, z, name, value, fill, ink, line)
+function M.update(self, id, x, y, z, name, value, fill, ink, kind)
 	go.set(id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), z))
-	msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
+	msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, kind))
 end
 
 -- id карты клетки (x, y) из последней синхронизации; nil — карты нет на экране.
@@ -163,11 +209,12 @@ function M.ensure_row(self, y)
 	local out = {}
 	for x = 0, layout.COLUMNS - 1 do
 		local cell = (row and row[x]) or { type = "EMPTY" }
+		local kind = M.move_kind(self, x, y)
 		local id = M.create(self, x, y, Z_CELL)
 		if id ~= nil then
-			local name, value, fill, ink, line = M.cell_view(self, cell)
-			msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
-			out[x] = { id = id, sig = M.cell_sig(cell) }
+			local name, value, fill, ink = M.cell_view(self, cell)
+			msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, kind))
+			out[x] = { id = id, sig = card_sig(cell, kind) }
 		end
 	end
 	self.cards[y] = out
@@ -184,19 +231,20 @@ function M.sync_cells(self, pr)
 		local row = M.content_row(self, y)
 		for x = 0, layout.COLUMNS - 1 do
 			local cell = (row and row[x]) or { type = "EMPTY" }
-			local sig = M.cell_sig(cell)
+			local kind = M.move_kind(self, x, y)
+			local sig = card_sig(cell, kind)
 			local card = old and old[x]
 			if card == nil then
 				local id = M.create(self, x, y, Z_CELL)
 				if id ~= nil then
-					local name, value, fill, ink, line = M.cell_view(self, cell)
-					msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
+					local name, value, fill, ink = M.cell_view(self, cell)
+					msg.post(id, "set", M.card_msg(self, x, y, name, value, fill, ink, kind))
 					card = { id = id, sig = sig }
 				end
 			elseif card.sig ~= sig then
 				go.set(card.id, "position", vmath.vector3(layout.cell_x(x), layout.world_center(y), Z_CELL))
-				local name, value, fill, ink, line = M.cell_view(self, cell)
-				msg.post(card.id, "set", M.card_msg(self, x, y, name, value, fill, ink, line))
+				local name, value, fill, ink = M.cell_view(self, cell)
+				msg.post(card.id, "set", M.card_msg(self, x, y, name, value, fill, ink, kind))
 				card.sig = sig
 			end
 			out[x] = card
@@ -239,10 +287,10 @@ function M.sync_player(self, pr)
 		vmath.vector3(layout.cell_x(pos.x), layout.world_center(pr), Z_ACTOR))
 	local view = style.PLAYER
 	local p = self.player
-	local fill, ink, line = colors(self, view.skin)
+	local fill, ink = colors(self, view.skin)
 	msg.post(self.player_go, "set",
 		M.card_msg(self, pos.x, pr, view.name, string.format("%d/%d", p.hp, p.max_hp),
-			fill, ink, line))
+			fill, ink, nil))
 end
 
 -- Карта босса: отдельный объект на верхнем ряду арены. Показывается уже в preview,
@@ -273,16 +321,18 @@ function M.sync_boss(self, pr)
 		return
 	end
 	local view = style.BOSS
-	local fill, ink, line = colors(self, view.skin)
+	local fill, ink = colors(self, view.skin)
 	M.update(self, self.boss_go, a.boss_x, boss_y, Z_ACTOR,
-		view.name, tostring(a.boss_hp), fill, ink, line)
+		view.name, tostring(a.boss_hp), fill, ink, nil)
 end
 
 -- Прокрутка контейнера рядов, diff клеток, карты акторов, очистка эфемерных ГО.
--- Подсветки (угрозы, обводки, пунктир) рисует координатор поверх — см. world.script.
+-- Индикация хода (рамки карт) считается здесь же; угрозы и пунктир рисует координатор
+-- поверх — см. world.script.
 function M.refresh(self)
 	local pr = self.world.pos.y
 	go.set(self.rows_id, "position", vmath.vector3(0, layout.container_y(pr), 0))
+	M.update_moves(self)
 	M.sync_cells(self, pr)
 	M.sync_player(self, pr)
 	M.sync_boss(self, pr)

@@ -1,8 +1,10 @@
 -- Палитра игры (GDD §16): цвета живут в узлах gui/palette.gui и правятся цветовым пикером
 -- GUI-редактора (RGBA + hex). У script properties пикера нет — docs/ENGINE_DEFOLD.md §3b.
 -- Узлы выключены (enabled: false): не рисуются, но их color читается через gui.get_color.
--- Прозрачность — поле Alpha узла (не 4-й компонент цвета, §3b): Alpha 0 у line_<skin> значит
--- «у карты нет обводки». gui.get_color возвращает alpha в w, board/card проверяют её.
+-- Прозрачность — поле Alpha узла (не 4-й компонент цвета, §3b): gui.get_color возвращает
+-- alpha в w, board/card проверяют её. У карт Alpha 1; рамка карты — не цвет узла карты,
+-- а роль хода (border_step/border_jump), поэтому «рамки нет» задаётся не Alpha, а тем,
+-- что клетка не цель хода.
 -- При старте цвета уходят в collections/world.script сообщением "palette"; тот хранит их
 -- в self.pal. Имена узлов = ключи scripts/view/palette.lua.
 

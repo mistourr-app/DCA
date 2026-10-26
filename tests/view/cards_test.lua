@@ -1,5 +1,6 @@
--- Название и значение на картах (GDD: карта показывает имя и число под ним).
--- cell_view — чистая сборка строк, поэтому проверяется без движка: подставляем только палитру.
+-- Название и значение на картах (GDD: карта показывает имя и число под ним),
+-- а также рамка карты — она кодирует не тип клетки, а вид хода.
+-- cell_view / card_msg — чистая сборка, поэтому проверяются без движка: подставляем палитру.
 local board = require("scripts.view.board")
 local palette = require("scripts.view.palette")
 
@@ -55,31 +56,43 @@ M["карта: ловушка арены показывает урон"] = funct
 	t.equal(value, "7", "урон клетки")
 end
 
-M["карта: цвета всегда есть"] = function(t)
+M["карта: фон и текст есть у всех типов"] = function(t)
 	for _, cell in ipairs({
 		{ type = "EMPTY" }, { type = "WALL" }, { type = "GOLD" },
 		{ type = "HEAL" }, { type = "CAMP" }, { type = "ATTACK_CELL" },
 		{ type = "ENEMY", enemy = "TYPE_1" },
 	}) do
-		local _, _, fill, ink, line = view(cell)
+		local _, _, fill, ink = view(cell)
 		t.true_(fill ~= nil, "нет цвета фона для " .. cell.type)
 		t.true_(ink ~= nil, "нет цвета текста для " .. cell.type)
-		t.true_(line ~= nil, "нет цвета обводки для " .. cell.type)
 	end
 end
 
--- Оверлей угрозы ужимается на толщину рамки: у пустой клетки рамки нет, ужать нечего.
+-- Рамка карты — индикация хода: цвет берётся из роли вида хода, а не из skin карты.
+M["рамка: цвет и толщина зависят от вида хода, а не от клетки"] = function(t)
+	local self_ = fake_self()
+	self_.pal.border_step = "зелёная роль"
+	self_.pal.border_jump = "фиолетовая роль"
+	self_.card_border = 3
+	self_.cell_gap = 8
+	local step = board.card_msg(self_, 1, 0, "Wall", "", "fill", "ink", "step")
+	t.equal(step.border_color, "зелёная роль", "шаг — цвет шага")
+	t.equal(step.border_width, 3, "толщина из geom_cfg.card_border")
+	local jump = board.card_msg(self_, 1, 0, "Wall", "", "fill", "ink", "jump")
+	t.equal(jump.border_color, "фиолетовая роль", "прыжок — цвет прыжка")
+	local none = board.card_msg(self_, 1, 0, "Wall", "", "fill", "ink", nil)
+	t.equal(none.border_color, nil, "нет хода — рамки нет")
+end
+
+-- Оверлей угрозы ужимается на толщину рамки, а рамка есть только у целей хода.
 M["подсветка: толщина рамки для оверлея угрозы"] = function(t)
 	local self_ = fake_self()
-	for _, key in ipairs(palette.KEYS) do
-		self_.pal[key] = { w = 1 }
-	end
-	self_.outline_width = 3
-	t.equal(board.cell_inset(self_, { type = "ENEMY", enemy = "TYPE_1" }), 3,
-		"у врага рамка есть — подсветка ужимается")
-	self_.pal.line_empty = { w = 0 }
-	t.equal(board.cell_inset(self_, { type = "EMPTY" }), 0, "у пустой клетки рамки нет")
-	t.equal(board.cell_inset(self_, nil), 0, "нет клетки — как пустая")
+	self_.card_border = 3
+	self_.moves = { [1] = { [3] = "step" } }
+	t.equal(board.cell_inset(self_, 3, 1), 3, "клетка — цель хода: подсветка ужимается")
+	t.equal(board.cell_inset(self_, 4, 1), 0, "соседняя клетка не цель хода — рамки нет")
+	t.equal(board.cell_inset(self_, 0, 5), 0, "ряд без ходов — рамки нет")
+	t.equal(board.cell_inset(self_, nil, nil), 0, "нет клетки — как без рамки")
 end
 
 return M

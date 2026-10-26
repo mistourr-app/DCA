@@ -52,18 +52,14 @@ local GEOM_CFG = "#geom_cfg"
 local ANIM_CFG = "#anim_cfg"
 local FLASH_CFG = "#flash_cfg"
 
--- Вид хода -> роль палитры для обводки. Обводится только перемещение:
--- цвет рамки не кодирует тип клетки (ловушка, враг — по своей карте).
-local OUTLINE_KEY = {
-	step = "outline_step", jump = "outline_jump",
-}
+-- Вид хода -> роль палитры для рамки карты — в scripts/view/board.lua (board.BORDER_KEY):
+-- рамка карты и есть индикация хода, отдельных обводок вокруг клеток нет.
 
 -- Чтение config-компонентов один раз при старте. Значения go.property — константы сборки,
 -- порядок init владельца не важен (docs/DEFOLD_INTEGRATION.md §4.2).
 local function read_config(self)
 	self.cell_gap = go.get(GEOM_CFG, "cell_gap")
-	self.border_width = go.get(GEOM_CFG, "border_width")
-	self.outline_width = go.get(GEOM_CFG, "outline_width")
+	self.card_border = go.get(GEOM_CFG, "card_border")
 	self.dash_step = go.get(GEOM_CFG, "dash_step")
 	self.dash_size = go.get(GEOM_CFG, "dash_size")
 	self.move_ms = go.get(ANIM_CFG, "move_ms")
@@ -89,13 +85,12 @@ local function check_palette(self)
 		need("полного набора scripts/view/palette.lua", key)
 	end
 	for type_, view in pairs(style) do
-		local fill, ink, line = palette.roles(view.skin)
+		local fill, ink = palette.roles(view.skin)
 		need("fill " .. type_, fill)
 		need("ink " .. type_, ink)
-		need("line " .. type_, line)
 	end
-	for _, key in pairs(OUTLINE_KEY) do
-		need("outline", key)
+	for _, key in pairs(board.BORDER_KEY) do
+		need("рамка хода", key)
 	end
 	need("dot", "dot")
 	need("vision", "vision")
@@ -146,7 +141,7 @@ local function ensure_arena_preview(self)
 	end
 end
 
--- Перерисовка: доска (контейнер, карты, акторы, очистка fx), затем подсветки поверх.
+-- Перерисовка: доска (контейнер, карты, акторы, рамки ходов, очистка fx), затем пунктир.
 local function refresh(self)
 	if self.pal == nil then
 		return -- палитра ещё не пришла от gui/palette.gui (первый кадр)
@@ -164,8 +159,8 @@ local function refresh(self)
 			local alpha = highlight.vision_alpha(vision_row[x])
 			if alpha ~= nil then
 				-- Оверлей ужимается на толщину рамки карты: подсветка закрывает подложку,
-				-- но не рамку (иначе она пропадает тем сильнее, чем непрозрачнее слой).
-				local inset = board.cell_inset(self, row and row[x])
+				-- но не рамку — иначе индикация хода пропадала бы под плотным слоем.
+				local inset = board.cell_inset(self, x, y)
 				if y == pr and x == self.world.pos.x and self.world.mode == MODES.WORLD then
 					-- Игрок в поле зрения: его клетка красная, над заливкой клетки и под картой персонажа.
 					fx.threat(self, layout.cell_x(x), cy, h, self.pal.spotted, alpha, Z_SPOTTED, inset)
@@ -175,27 +170,17 @@ local function refresh(self)
 			end
 		end
 	end
+	-- Индикация хода — рамки карт, их ставит board.refresh по board.update_moves.
+	-- Здесь остаётся только пунктир выстрела: белый, самый верхний слой.
 	local reach = registry.equipment.CROSSBOW.range
 	if self.world.mode == MODES.WORLD then
-		-- Подсветка ходов на следующий ряд (шаг, прыжок). Враги не обводятся: у карты своя рамка.
-		local up_y = pr + 1
-		for _, m in ipairs(highlight.moves(self.world.pos, self.player.hp, board.get_row(self, up_y))) do
-			fx.outline(self, layout.cell_x(m.x), layout.world_center(up_y),
-				layout.CELL_W, layout.row_height(up_y), self.pal[OUTLINE_KEY[m.kind]])
-		end
-		-- Пунктир до каждой цели, в которую выстрел возможен.
 		local py = layout.world_center(pr)
 		for _, x in ipairs(highlight.shot_targets(self.world.pos, board.get_row(self, pr), self.player.weapon, reach)) do
 			fx.dashed(self, layout.cell_x(self.world.pos.x), py, layout.cell_x(x), py)
 		end
 	elseif self.world.mode == MODES.BOSS and self.arena ~= nil then
-		-- Подсветка ходов по X на ряду игрока и пунктир выстрела по боссу.
-		-- Клетки-ловушки обводятся как обычные ходы: снаружи — только индикация перемещения.
+		-- Пунктир выстрела по боссу.
 		local a = self.arena
-		for _, m in ipairs(highlight.arena_moves(a)) do
-			fx.outline(self, layout.cell_x(m.x), layout.world_center(pr),
-				layout.CELL_W, layout.row_height(pr), self.pal[OUTLINE_KEY[m.kind]])
-		end
 		local boss_x = highlight.arena_shot(a, self.player.weapon, reach)
 		if boss_x ~= nil then
 			fx.dashed(self, layout.cell_x(a.player_x), layout.world_center(pr),

@@ -1,835 +1,309 @@
 script: "/gui/palette.gui_script"
-adjust_reference: ADJUST_REFERENCE_DISABLED
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "outline_step"
   color {
     x: 0.063
     y: 0.725
     z: 0.506
-    w: 1.0
   }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
+  type: TYPE_BOX
+  id: "border_step"
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "outline_jump"
   color {
     x: 0.62
     y: 0.427
-    z: 1.0
-    w: 1.0
   }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
+  type: TYPE_BOX
+  id: "border_jump"
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
   type: TYPE_BOX
   id: "dot"
-  color {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    x: 0.6352459
+    y: 0.15881148
+    z: 0.15881148
   }
   type: TYPE_BOX
   id: "vision"
-  color {
-    x: 1.0
-    y: 0.451
-    z: 0.106
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    y: 0.122
+    z: 0.122
   }
   type: TYPE_BOX
   id: "spotted"
-  color {
-    x: 1.0
-    y: 0.122
-    z: 0.122
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    x: 0.101960786
+    y: 0.101960786
+    z: 0.101960786
   }
   type: TYPE_BOX
   id: "fill_empty"
-  color {
-    x: 0.102
-    y: 0.114
-    z: 0.157
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
+  }
+  color {
+    x: 0.0
+    y: 0.0
     z: 0.0
-    w: 1.0
   }
   type: TYPE_BOX
   id: "ink_empty"
-  color {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_empty"
-  color {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  alpha: 0.0
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
-  }
-  type: TYPE_BOX
-  id: "fill_wall"
   color {
     x: 0.247
     y: 0.271
     z: 0.337
-    w: 1.0
   }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
+  type: TYPE_BOX
+  id: "fill_wall"
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
   type: TYPE_BOX
   id: "ink_wall"
-  color {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_wall"
   color {
-    x: 0.36
-    y: 0.40
-    z: 0.47
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
+    x: 0.029024456
+    y: 0.29508197
+    z: 0.2069209
   }
   type: TYPE_BOX
   id: "fill_heal"
-  color {
-    x: 0.063
-    y: 0.725
-    z: 0.506
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    x: 0.0627451
+    y: 0.7254902
+    z: 0.5058824
   }
   type: TYPE_BOX
   id: "ink_heal"
-  color {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_heal"
   color {
-    x: 0.03
-    y: 0.42
-    z: 0.30
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
+    x: 0.43442622
+    y: 0.36843744
     z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
   }
   type: TYPE_BOX
   id: "fill_gold"
-  color {
-    x: 1.0
-    y: 0.906
-    z: 0.38
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    y: 0.90588236
+    z: 0.38039216
   }
   type: TYPE_BOX
   id: "ink_gold"
-  color {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_gold"
   color {
-    x: 0.55
-    y: 0.42
-    z: 0.10
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
+    x: 0.30327868
     y: 0.0
     z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
   }
   type: TYPE_BOX
   id: "fill_enemy"
-  color {
-    x: 1.0
-    y: 0.122
-    z: 0.122
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
+  alpha: 0.87
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    y: 0.12156863
+    z: 0.12156863
   }
   type: TYPE_BOX
   id: "ink_enemy"
-  color {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_enemy"
   color {
-    x: 1.0
-    y: 0.55
-    z: 0.35
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
+    x: 0.3019608
     y: 0.0
     z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
   }
   type: TYPE_BOX
   id: "fill_attack"
-  color {
-    x: 0.769
-    y: 0.0
-    z: 0.078
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    y: 0.12156863
+    z: 0.12156863
   }
   type: TYPE_BOX
   id: "ink_attack"
-  color {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_attack"
   color {
-    x: 1.0
-    y: 0.35
-    z: 0.25
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
+    x: 0.1406208
+    y: 0.36582413
+    z: 0.37295082
   }
   type: TYPE_BOX
   id: "fill_camp"
-  color {
-    x: 0.361
-    y: 0.98
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    x: 0.36078432
+    y: 0.98039216
   }
   type: TYPE_BOX
   id: "ink_camp"
-  color {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_camp"
   color {
-    x: 0.16
-    y: 0.55
-    z: 0.65
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
+    x: 0.9019608
+    y: 0.9019608
+    z: 0.9019608
   }
   type: TYPE_BOX
   id: "fill_player"
-  color {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    x: 0.2
+    y: 0.2
+    z: 0.2
   }
   type: TYPE_BOX
   id: "ink_player"
-  color {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
   }
-  type: TYPE_BOX
-  id: "line_player"
   color {
-    x: 0.10
-    y: 0.14
-    z: 0.22
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
+    x: 0.3254902
+    y: 0.2
+    z: 0.14509805
   }
   type: TYPE_BOX
   id: "fill_boss"
-  color {
-    x: 1.0
-    y: 0.122
-    z: 0.122
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
 nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
   size {
     x: 64.0
     y: 64.0
-    z: 0.0
-    w: 1.0
+  }
+  color {
+    y: 0.12156863
+    z: 0.12156863
   }
   type: TYPE_BOX
   id: "ink_boss"
-  color {
-    x: 1.0
-    y: 1.0
-    z: 1.0
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
   enabled: false
 }
-nodes {
-  position {
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    w: 1.0
-  }
-  size {
-    x: 64.0
-    y: 64.0
-    z: 0.0
-    w: 1.0
-  }
-  type: TYPE_BOX
-  id: "line_boss"
-  color {
-    x: 1.0
-    y: 0.80
-    z: 0.30
-    w: 1.0
-  }
-  xanchor: XANCHOR_NONE
-  yanchor: YANCHOR_NONE
-  pivot: PIVOT_CENTER
-  enabled: false
-}
+material: "/builtins/materials/gui.material"
+adjust_reference: ADJUST_REFERENCE_DISABLED
